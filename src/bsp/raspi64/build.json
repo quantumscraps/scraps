@@ -1,0 +1,6 @@
+{
+	"name": "raspi64",
+	"target": "aarch64-unknown-none",
+	"rustflags": ["-C target-cpu=cortex-a53"],
+	"features": ["bsp_raspi64"]
+}
