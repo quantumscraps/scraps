@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from pathlib import Path
 import json, subprocess, os, shutil, sys
 
@@ -35,9 +35,14 @@ def build(board):
     command = [shutil.which("cargo"), "rustc", f"--target={target}", "--release"]
     for feature in features:
         command.extend(["--features", f"{feature}"])
-    print(command)
-    print(rustflags)
-    subprocess.Popen(command, env={"RUSTFLAGS": rustflags})
+    print(f"executing: RUSTFLAGS={rustflags} {' '.join(command)}")
+    command.extend(["--color", "always"])
+    p = subprocess.Popen(command, env={"RUSTFLAGS": rustflags, "PATH": os.environ["PATH"]})
+    p.communicate()
+    if p.returncode == 0:
+        print(":) success")
+    else:
+        print(":( failure")
 def usage():
     err(f"Usage: {sys.argv[0]} build <board name>\n[!] Or {sys.argv[0]} list-boards")
 def main():
