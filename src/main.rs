@@ -12,9 +12,11 @@ mod drivers;
 mod driver_interfaces;
 
 use core::fmt::Write;
+use driver_interfaces::*;
 
 #[no_mangle]
 pub unsafe extern "C" fn kernel_init() -> ! {
+    bsp::UART.init();
     writeln!(bsp::UART, "Hello, World!");
     cpu::wait_forever()
 }
