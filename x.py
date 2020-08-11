@@ -47,6 +47,8 @@ def build(board):
     else:
         print(":( failure")
 def run(board):
+    print(f"Building for {board}")
+    build(board)
     bsp = Path("src/bsp")
     build_json = bsp / board / "build.json"
     bf = open(build_json)
