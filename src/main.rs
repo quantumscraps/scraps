@@ -17,6 +17,6 @@ use driver_interfaces::*;
 #[no_mangle]
 pub unsafe extern "C" fn kernel_init() -> ! {
     bsp::UART.init();
-    writeln!(bsp::UART, "Hello, World!");
+    let _ = writeln!(bsp::UART, "Hello, World!");
     cpu::wait_forever()
 }

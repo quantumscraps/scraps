@@ -64,6 +64,28 @@ def run(board):
         subprocess.check_call(runcmd)
     except KeyboardInterrupt:
         print("Exited on interrupt (^C)")
+def generate_vscode(board):
+    print(f"Generating vscode settings for {board}")
+    bsp = Path("src/bsp")
+    build_json = bsp / board / "build.json"
+    with open(build_json) as bf:
+        build_dict = json.load(bf)
+    target = build_dict.get("target")
+    features = build_dict.get("features")
+    settings = {
+        "rust-analyzer.cargo.features": features,
+        "rust-analyzer.cargo.target": target,
+        "rust-analyzer.checkOnSave.allTargets": False,
+        "rust-analyzer.checkOnSave.extraArgs": [
+            "--target",
+            target,
+        ],
+    }
+    vspath = Path(".vscode")
+    vspath.mkdir(parents=True, exist_ok=True)
+    with open(".vscode/settings.json", "w") as f:
+        json.dump(settings, f)
+    print(f"Written settings to .vscode/settings.json")
 def clean():
     pth = Path("target")
     if pth.exists():
@@ -72,7 +94,13 @@ def clean():
     else:
         print("nothing to do")
 def usage():
-    err(f"Usage: {sys.argv[0]} build <board name>\nOr {sys.argv[0]} run <board name>\nOr {sys.argv[0]} list-boards\nOr {sys.argv[0]} clean")
+    err(f"""
+Usage: {sys.argv[0]} build <board name>
+Or {sys.argv[0]} run <board name>
+Or {sys.argv[0]} list-boards
+Or {sys.argv[0]} clean
+Or {sys.argv[0]} generate-vscode <board name>
+""")
 def main():
     if len(sys.argv) < 2:
         usage()
@@ -84,6 +112,9 @@ def main():
         build(sys.argv[2])
     elif sys.argv[1] == "run" and len(sys.argv) == 3:
         run(sys.argv[2])
+    elif sys.argv[1] == "generate-vscode" and len(sys.argv) == 3:
+        generate_vscode(sys.argv[2])
+        return
     elif sys.argv[1] == "clean":
         clean()
         return
