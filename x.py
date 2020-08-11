@@ -43,11 +43,14 @@ def build(board):
     p.communicate()
     if p.returncode == 0:
         print(":) success")
+        return True
     else:
         print(":( failure")
+        return False
 def run(board):
     print(f"Building for {board}")
-    build(board)
+    if not build(board):
+        return
     bsp = Path("src/bsp")
     build_json = bsp / board / "build.json"
     bf = open(build_json)
