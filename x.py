@@ -13,9 +13,8 @@ def list_boards():
     if not bsp.is_dir():
         err("bsp directory does not exist!")
     print("=== Board listing ===")
-    for (i, thing) in enumerate(bsp.iterdir(), start=1):
-        if thing.is_dir():
-            print(f"{i}. {thing.name}")
+    for (i, thing) in enumerate(filter(lambda x: x.is_dir(), bsp.iterdir()), start=1):
+        print(f"{i}. {thing.name}")
 
 def build(board):
     bsp = Path("src/bsp")
