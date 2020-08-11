@@ -50,14 +50,16 @@ def run(board):
     bsp = Path("src/bsp")
     build_json = bsp / board / "build.json"
     bf = open(build_json)
-    build = json.load(bf)
+    build_dict = json.load(bf)
     bf.close()
-    runcmd = build.get("runcmd")
-    target = build.get("target")
+    runcmd = build_dict.get("runcmd")
+    target = build_dict.get("target")
     runcmd.append(f"target/{target}/release/{NAME}")
     print(f"Running {' '.join(runcmd)}")
-    #p = subprocess.Popen(runcmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=os.environ) # can't figure this out so os.system for now
-    os.system(" ".join(runcmd))
+    try:
+        subprocess.check_call(runcmd, env=os.environ)
+    except KeyboardInterrupt:
+        print("Exited on interrupt (^C)")
 def clean():
     pth = Path("target")
     if pth.exists():
