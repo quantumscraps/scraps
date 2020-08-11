@@ -58,7 +58,7 @@ def run(board):
     runcmd.append(f"target/{target}/release/{NAME}")
     print(f"Running {' '.join(runcmd)}")
     try:
-        subprocess.check_call(runcmd, env=os.environ)
+        subprocess.check_call(runcmd)
     except KeyboardInterrupt:
         print("Exited on interrupt (^C)")
 def clean():
