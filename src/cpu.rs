@@ -2,7 +2,7 @@
 #[path = "arch/aarch64/cpu.rs"]
 mod arch_cpu;
 
-#[cfg(target_arch = "riscv")]
+#[cfg(target_arch = "riscv64")]
 #[path = "arch/riscv/cpu.rs"]
 mod arch_cpu;
 

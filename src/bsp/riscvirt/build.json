@@ -2,6 +2,6 @@
 	"name": "riscvirt",
 	"target": "riscv64gc-unknown-none-elf",
 	"features": ["bsp_riscvirt"],
-	"rustflags": [],
-	"runcmd": []
+	"rustflags": ["-C codegen-units=1"],
+	"runcmd": ["qemu-system-riscv64", "-M", "virt", "-d", "in_asm", "-display", "none", "-kernel"]
 }
