@@ -1,0 +1,7 @@
+{
+	"name": "riscvirt",
+	"target": "riscv64gc-unknown-none-elf",
+	"features": ["bsp_riscvirt"],
+	"rustflags": [],
+	"runcmd": []
+}

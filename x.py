@@ -2,8 +2,11 @@
 from pathlib import Path
 import json, subprocess, os, shutil, sys
 
-def err(msg):
-    print(f"[!] {msg}")
+NAME = "scraps"
+
+def err(msgs):
+    for msg in msgs.split("\n"):
+        print(f"[!] {msg}")
     exit(1)
 def list_boards():
     bsp = Path("src/bsp")
@@ -32,7 +35,7 @@ def build(board):
     rustflags = " ".join(rustflags)
     if "RUSTFLAGS" in os.environ:
         rustflags = f"{os.environ['RUSTFLAGS']} {rustflags}"
-    command = [shutil.which("cargo"), "rustc", f"--target={target}", "--release"]
+    command = ["cargo", "rustc", f"--target={target}", "--release"]
     for feature in features:
         command.extend(["--features", f"{feature}"])
     print(f"executing: RUSTFLAGS={rustflags} {' '.join(command)}")
@@ -43,8 +46,27 @@ def build(board):
         print(":) success")
     else:
         print(":( failure")
+def run(board):
+    bsp = Path("src/bsp")
+    build_json = bsp / board / "build.json"
+    bf = open(build_json)
+    build = json.load(bf)
+    bf.close()
+    runcmd = build.get("runcmd")
+    target = build.get("target")
+    runcmd.append(f"target/{target}/release/{NAME}")
+    print(f"Running {' '.join(runcmd)}")
+    #p = subprocess.Popen(runcmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=os.environ) # can't figure this out so os.system for now
+    os.system(" ".join(runcmd))
+def clean():
+    pth = Path("target")
+    if pth.exists():
+        print("cleaning...")
+        shutil.rmtree("target")
+    else:
+        print("nothing to do")
 def usage():
-    err(f"Usage: {sys.argv[0]} build <board name>\n[!] Or {sys.argv[0]} list-boards")
+    err(f"Usage: {sys.argv[0]} build <board name>\nOr {sys.argv[0]} run <board name>\nOr {sys.argv[0]} list-boards\nOr {sys.argv[0]} clean")
 def main():
     if len(sys.argv) < 2:
         usage()
@@ -54,6 +76,11 @@ def main():
         return
     elif sys.argv[1] == "build" and len(sys.argv) == 3:
         build(sys.argv[2])
+    elif sys.argv[1] == "run" and len(sys.argv) == 3:
+        run(sys.argv[2])
+    elif sys.argv[1] == "clean":
+        clean()
+        return
     else:
         usage()
         return
