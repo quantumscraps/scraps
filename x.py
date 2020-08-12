@@ -39,7 +39,12 @@ def build(board):
         command.extend(["--features", f"{feature}"])
     print(f"executing: RUSTFLAGS={rustflags} {' '.join(command)}")
     command.extend(["--color", "always"])
-    p = subprocess.Popen(command, env={"RUSTFLAGS": rustflags, "PATH": os.environ["PATH"]})
+    e = {"RUSTFLAGS": rustflags}
+    evars = ["PATH", "TMP", "TEMP", "SYSTEMROOT"]
+    for evar in evars:
+        if evar in os.environ:
+            e[evar] = os.environ[evar]
+    p = subprocess.Popen(command, env=e)
     p.communicate()
     if p.returncode == 0:
         print(":) success")
