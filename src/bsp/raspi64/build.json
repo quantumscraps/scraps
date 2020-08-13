@@ -3,5 +3,5 @@
 	"target": "aarch64-unknown-none-softfloat",
 	"rustflags": ["-C target-cpu=cortex-a53"],
 	"features": ["bsp_raspi64"],
-	"runcmd": ["qemu-system-aarch64", "-M", "raspi3", "-d", "in_asm", "-display", "none", "-kernel"]
+	"runcmd": ["qemu-system-aarch64", "-M", "raspi3", "-display", "none", "-serial", "stdio", "-kernel"]
 }

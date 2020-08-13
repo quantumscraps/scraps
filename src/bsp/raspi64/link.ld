@@ -2,6 +2,7 @@ ENTRY(_header)
 
 SECTIONS
 {
+	. = 0x80000;
 	__start = .;
 	.text :
 	{
