@@ -9,14 +9,24 @@ mod memory;
 mod panic;
 mod print;
 mod util;
+mod time;
 mod drivers;
 mod driver_interfaces;
 
 use driver_interfaces::*;
+use core::time::Duration;
+use crate::time::TimeCounter;
 
+
+// still unsafe because mutable statics are unsafe !!
+// we need a mutex eventually
 #[no_mangle]
 pub unsafe extern "C" fn kernel_init() -> ! {
     bsp::UART.init();
-    let _ = println!("[{}] Hello, World!", 0);
-    cpu::wait_forever()
+    printk!("Timer Accuracy: {} ns", time::time_counter().accuracy().as_nanos());
+    loop {
+        printk!("Hello, World!");
+        time::time_counter().wait_for(Duration::from_secs(1));
+    }
+    //cpu::wait_forever()
 }
