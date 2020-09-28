@@ -1,4 +1,5 @@
 #![feature(asm)]
+#![feature(duration_zero)]
 #![feature(global_asm)]
 #![no_main]
 #![no_std]
