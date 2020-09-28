@@ -1,5 +1,5 @@
 use crate::time;
-use crate::bsp::{NANOS_PER_TICK, HAS_RDTIME};
+use crate::bsp::{NANOS_PER_TICK, TICKS_PER_NANO, HAS_RDTIME};
 use core::time::Duration;
 
 pub struct RISCVTimer;
@@ -10,23 +10,9 @@ pub fn time_counter() -> &'static impl time::TimeCounter {
     &TIME_COUNTER
 }
 
-impl time::TimeCounter for RISCVTimer {
-    fn accuracy(&self) -> Duration {
-        // empirically measure timer accuracy
-        const SAMPLE_SIZE: usize = 10_000;
-        let mut durations: [Duration; SAMPLE_SIZE] = [Duration::zero(); SAMPLE_SIZE];
-        let mut durations2: [Duration; SAMPLE_SIZE] = [Duration::zero(); SAMPLE_SIZE];
-        for i in 0..SAMPLE_SIZE {
-            durations[i] = self.uptime();
-            durations2[i] = self.uptime();
-        }
-        let mut diff_total: u64 = 0;
-        for (d1, d2) in durations.iter().zip(durations2.iter()) {
-            diff_total += (*d2 - *d1).as_nanos() as u64;
-        }
-        Duration::from_nanos(diff_total / (SAMPLE_SIZE as u64))
-    }
-    fn uptime(&self) -> Duration {
+impl RISCVTimer {
+    #[inline(always)]
+    fn raw_time(&self) -> u64 {
         let mut time: u64;
         unsafe {
             if HAS_RDTIME {
@@ -41,7 +27,24 @@ impl time::TimeCounter for RISCVTimer {
                 );
             }
         }
-        Duration::from_nanos(time * NANOS_PER_TICK)
+        time
+    }
+}
+
+impl time::TimeCounter for RISCVTimer {
+    fn accuracy(&self) -> Duration {
+        // empirically measure timer accuracy
+        const SAMPLE_SIZE: usize = 1_000_000;
+        let mut diff_total: u64 = 0;
+        for i in 0..SAMPLE_SIZE {
+            let d1 = self.raw_time();
+            let d2 = self.raw_time();
+            diff_total += d2 - d1;
+        }
+        Duration::from_nanos(diff_total / SAMPLE_SIZE as u64 * NANOS_PER_TICK / TICKS_PER_NANO)
+    }
+    fn uptime(&self) -> Duration {
+        Duration::from_nanos(self.raw_time() * NANOS_PER_TICK / TICKS_PER_NANO)
     }
     fn wait_for(&self, duration: Duration) {
         let begin = self.uptime();

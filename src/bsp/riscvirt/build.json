@@ -1,7 +1,22 @@
 {
 	"name": "riscvirt",
 	"target": "riscv64gc-unknown-none-elf",
-	"features": ["bsp_riscvirt"],
-	"rustflags": ["-C codegen-units=1"],
-	"runcmd": ["qemu-system-riscv64", "-M", "virt", "-display", "none", "-serial", "stdio", "-bios", "none", "-kernel"]
+	"features": [
+		"bsp_riscvirt"
+	],
+	"rustflags": [
+		"-C codegen-units=1"
+	],
+	"runcmd": [
+		"qemu-system-riscv64",
+		"-M",
+		"virt",
+		"-display",
+		"none",
+		"-serial",
+		"stdio",
+		"-bios",
+		"none",
+		"-kernel"
+	]
 }
