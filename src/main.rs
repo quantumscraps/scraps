@@ -23,6 +23,8 @@ use crate::time::TimeCounter;
 #[no_mangle]
 pub unsafe extern "C" fn kernel_init() -> ! {
     bsp::UART.init();
+    let v = 12;
+    printk!("Address of some stack variable is {:?}", (&v as *const _));
     printk!("Timer Accuracy: {} ns", time::time_counter().accuracy().as_nanos());
     loop {
         printk!("Hello, World!");

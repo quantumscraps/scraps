@@ -16,7 +16,7 @@ def list_boards():
     for (i, thing) in enumerate(filter(lambda x: x.is_dir(), bsp.iterdir()), start=1):
         print(f"{i}. {thing.name}")
 
-def build(board):
+def build(board, debug=False):
     bsp = Path("src/bsp")
     build_json = bsp / board / "build.json"
     link = bsp / board / "link.ld"
@@ -34,10 +34,12 @@ def build(board):
     rustflags = " ".join(rustflags)
     if "RUSTFLAGS" in os.environ:
         rustflags = f"{os.environ['RUSTFLAGS']} {rustflags}"
-    command = ["cargo", "rustc", f"--target={target}", "--release"]
+    command = ["cargo", "rustc", f"--target={target}"]
+    if not debug:
+        command.append("--release")
     for feature in features:
         command.extend(["--features", f"{feature}"])
-    print(f"executing: RUSTFLAGS={rustflags} {' '.join(command)}")
+    print(f"executing: RUSTFLAGS=\"{rustflags}\" {' '.join(command)}")
     command.extend(["--color", "always"])
     e = {"RUSTFLAGS": rustflags}
     evars = ["PATH", "TMP", "TEMP", "SYSTEMROOT"]
@@ -64,6 +66,24 @@ def run(board):
     runcmd = build_dict.get("runcmd")
     target = build_dict.get("target")
     runcmd.append(f"target/{target}/release/{NAME}")
+    print(f"Running {' '.join(runcmd)}")
+    try:
+        subprocess.check_call(runcmd)
+    except KeyboardInterrupt:
+        print("Exited on interrupt (^C)")
+def debug(board):
+    print(f"Debugging {board}")
+    if not build(board, debug=True):
+        return
+    bsp = Path("src/bsp")
+    build_json = bsp / board / "build.json"
+    bf = open(build_json)
+    build_dict = json.load(bf)
+    bf.close()
+    runcmd = build_dict.get("runcmd")
+    target = build_dict.get("target")
+    runcmd.append(f"target/{target}/debug/{NAME}")
+    runcmd.extend(["-s", "-S"])
     print(f"Running {' '.join(runcmd)}")
     try:
         subprocess.check_call(runcmd)
@@ -102,6 +122,7 @@ def usage():
     err(f"""
 Usage: {sys.argv[0]} build <board name>
 Or {sys.argv[0]} run <board name>
+Or {sys.argv[0]} debug <board name> (starts gdbserver on localhost:1234)
 Or {sys.argv[0]} list-boards
 Or {sys.argv[0]} clean
 Or {sys.argv[0]} generate-vscode <board name>
@@ -117,6 +138,8 @@ def main():
         build(sys.argv[2])
     elif sys.argv[1] == "run" and len(sys.argv) == 3:
         run(sys.argv[2])
+    elif sys.argv[1] == "debug" and len(sys.argv) == 3:
+        debug(sys.argv[2])
     elif sys.argv[1] == "generate-vscode" and len(sys.argv) == 3:
         generate_vscode(sys.argv[2])
         return
