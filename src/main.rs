@@ -38,7 +38,7 @@ pub unsafe extern "C" fn kernel_init(dtb_addr: *mut i8) -> ! {
         printk!("Failed to read dtb error = {:?}", e);
     }
     // for testing ig
-    let lock = lock::Lock::new();
+    let _lock = lock::Lock::new();
     printk!("Address of some stack variable is {:?}", (&v as *const _));
     printk!(
         "Timer Accuracy: {} ns",

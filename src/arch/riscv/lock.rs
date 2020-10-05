@@ -1,4 +1,3 @@
-use crate::{print, printk, println};
 use core::cell::UnsafeCell;
 
 /// A RISC-V atomic instruction based lock.
@@ -33,9 +32,9 @@ impl Lock {
 
     /// Unlock the lock, regardless of its previous state.
     pub fn unlock(&self) {
-        let mut value: u8 = 0;
+        let mut _value: u8 = 0;
         unsafe {
-            asm!("amoswap.w.rl {0}, {0}, ({1})", inout(reg) value, in(reg) self.0.get());
+            asm!("amoswap.w.rl {0}, {0}, ({1})", inout(reg) _value, in(reg) self.0.get());
         }
     }
 

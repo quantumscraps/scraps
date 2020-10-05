@@ -37,7 +37,7 @@ impl time::TimeCounter for RISCVTimer {
         // empirically measure timer accuracy
         const SAMPLE_SIZE: usize = 1_000_000;
         let mut diff_total: u64 = 0;
-        for i in 0..SAMPLE_SIZE {
+        for _ in 0..SAMPLE_SIZE {
             let d1 = self.raw_time();
             let d2 = self.raw_time();
             diff_total += d2 - d1;

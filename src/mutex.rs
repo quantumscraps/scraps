@@ -1,5 +1,4 @@
 use crate::lock::Lock;
-use core::borrow::Borrow;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
