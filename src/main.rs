@@ -8,7 +8,9 @@ mod bsp;
 mod cpu;
 mod driver_interfaces;
 mod drivers;
+mod lock;
 mod memory;
+mod mutex;
 mod panic;
 mod print;
 mod time;
@@ -22,7 +24,7 @@ use driver_interfaces::*;
 // we need a mutex eventually
 #[no_mangle]
 pub unsafe extern "C" fn kernel_init(dtb_addr: *mut i8) -> ! {
-    bsp::UART.init();
+    bsp::UART.get().init();
     let v = 12;
     printk!("dtb_addr = {:?}", dtb_addr);
     let r = dtb::Reader::read_from_address(dtb_addr as _);
@@ -35,6 +37,8 @@ pub unsafe extern "C" fn kernel_init(dtb_addr: *mut i8) -> ! {
     } else if let Err(e) = r {
         printk!("Failed to read dtb error = {:?}", e);
     }
+    // for testing ig
+    let lock = lock::Lock::new();
     printk!("Address of some stack variable is {:?}", (&v as *const _));
     printk!(
         "Timer Accuracy: {} ns",
