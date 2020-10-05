@@ -39,33 +39,6 @@ impl<T> Mutex<T> {
         self.lock.spin_lock();
         self.mg()
     }
-
-    /// Try to immutably borrow the value in this mutex.
-    /// This will fail if the lock is held.
-    pub fn try_borrow(&self) -> Option<&T> {
-        if self.lock.is_held() {
-            None
-        } else {
-            Some(&self.value)
-        }
-    }
-
-    /// Spin to immutably borrow the value in this mutex.
-    pub fn borrow(&self) -> &T {
-        loop {
-            if !self.lock.is_held() {
-                break;
-            }
-        }
-        &self.value
-    }
-}
-
-/// Not sure if this is OK in terms of "unexpected surprises."
-impl<T> Borrow<T> for Mutex<T> {
-    fn borrow(&self) -> &T {
-        self.borrow()
-    }
 }
 
 unsafe impl<T> Sync for Mutex<T> {}
