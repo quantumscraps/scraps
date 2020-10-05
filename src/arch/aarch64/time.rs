@@ -74,7 +74,8 @@ impl time::TimeCounter for ARMv8Timer {
                     result = out(reg) res,
                 );
             }
-            if res & 0b100 == 0b100 { // if the status met bit is set
+            if res & 0b100 == 0b100 {
+                // if the status met bit is set
                 break;
             }
         }

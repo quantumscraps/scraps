@@ -45,7 +45,7 @@ impl Uart for NS16550A {
 
     fn get(&mut self) -> Option<u8> {
         unsafe {
-            if mmio::lb(self.base_address + 5) & 1 == 0{
+            if mmio::lb(self.base_address + 5) & 1 == 0 {
                 None
             } else {
                 Some(mmio::lb(self.base_address))

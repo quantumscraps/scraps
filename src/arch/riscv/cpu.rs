@@ -14,7 +14,5 @@ pub fn wait_forever() -> ! {
 }
 
 pub fn nop() {
-    unsafe {
-        asm!("nop")
-    }
+    unsafe { asm!("nop") }
 }

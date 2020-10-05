@@ -1,7 +1,8 @@
+use crate::bsp::{HAS_RDTIME, NANOS_PER_TICK, TICKS_PER_NANO};
 use crate::time;
-use crate::bsp::{NANOS_PER_TICK, TICKS_PER_NANO, HAS_RDTIME};
 use core::time::Duration;
 
+// TODO: support fractional nanos/tick or ticks/nano
 pub struct RISCVTimer;
 
 static TIME_COUNTER: RISCVTimer = RISCVTimer;
@@ -48,8 +49,6 @@ impl time::TimeCounter for RISCVTimer {
     }
     fn wait_for(&self, duration: Duration) {
         let begin = self.uptime();
-        while self.uptime() - begin < duration {
-            /* spin */
-        }
+        while self.uptime() - begin < duration { /* spin */ }
     }
 }

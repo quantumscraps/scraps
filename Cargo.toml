@@ -9,6 +9,7 @@ edition = "2018"
 lto = true
 
 [dependencies]
+dtb = "0.2.0"
 
 [features]
 bsp_raspi64 = []

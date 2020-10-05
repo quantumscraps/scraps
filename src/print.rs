@@ -17,7 +17,7 @@ macro_rules! println {
 	($fmt:expr, $($args:tt)+) => ({
 		print!(concat!($fmt, "\r\n"), $($args)+)
 	});
-}	
+}
 
 #[macro_export]
 macro_rules! printk {

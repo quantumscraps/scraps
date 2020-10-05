@@ -1,6 +1,6 @@
 use crate::driver_interfaces::Uart;
 use crate::util::mmio;
-use crate::{cpu, bsp};
+use crate::{bsp, cpu};
 mod uart {
     pub const DR: usize = 0x00201000;
     pub const FR: usize = 0x00201018;
@@ -16,7 +16,7 @@ mod gpio {
     pub const GPPUDCLK0: usize = 0x00200098;
 }
 pub struct PL011 {
-    base: usize
+    base: usize,
 }
 
 impl PL011 {
@@ -39,17 +39,16 @@ impl Uart for PL011 {
         self.base = bsp::mmio_base();
         // get GPFSEL1 and map pins 14 and 15 to TX and RX
         let mut r: u32 = mmio::ld(self.base + gpio::GPFSEL1);
-        r &= !((7<<12)|(7<<15));
-        r |= (4<<12)|(4<<15);
+        r &= !((7 << 12) | (7 << 15));
+        r |= (4 << 12) | (4 << 15);
         mmio::sd(self.base + gpio::GPFSEL1, r);
         // enable pins 14 and 15
         mmio::sd(self.base + gpio::GPPUD, 0);
         cpu::spin_for_cycles(150);
-        mmio::sd(self.base + gpio::GPPUDCLK0, (1<<14)|(1<<15));
+        mmio::sd(self.base + gpio::GPPUDCLK0, (1 << 14) | (1 << 15));
         cpu::spin_for_cycles(150);
         // flush GPIO setup
         mmio::sd(self.base + gpio::GPPUDCLK0, 0);
-
 
         // turn off UART temporarily with CR (Control Register)
         mmio::sd(self.base + uart::CR, 0);
@@ -62,7 +61,7 @@ impl Uart for PL011 {
         // because 0.02083*64 = 1.3312, rounded to 1
         mmio::sd(self.base + uart::FBRD, 1);
         // set LCRH to 8 bit chars and enable FIFO
-        mmio::sd(self.base + uart::LCRH, 0b11<<5 | 0b1<<4);
+        mmio::sd(self.base + uart::LCRH, 0b11 << 5 | 0b1 << 4);
         // set CR to enable UART, TX, and RX
         mmio::sd(self.base + uart::CR, 0b1 << 9 | 0b1 << 8 | 0b1);
     }
