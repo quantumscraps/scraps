@@ -9,13 +9,13 @@ macro_rules! print {
 #[macro_export]
 macro_rules! println {
 	() => ({
-		print!("\r\n")
+		$crate::print!("\r\n")
 	});
 	($fmt:expr) => ({
-		print!(concat!($fmt, "\r\n"))
+		$crate::print!(concat!($fmt, "\r\n"))
 	});
 	($fmt:expr, $($args:tt)+) => ({
-		print!(concat!($fmt, "\r\n"), $($args)+)
+		$crate::print!(concat!($fmt, "\r\n"), $($args)+)
 	});
 }
 
@@ -25,18 +25,18 @@ macro_rules! printk {
 		use crate::time::TimeCounter;
 		let timestamp = crate::time::time_counter().uptime();
 		let timestamp_us = timestamp.subsec_micros();
-		println!("[{:>5}.{:03}{:03}]", timestamp.as_secs(), timestamp_us / 1000, timestamp_us % 1000)
+		$crate::println!("[{:>5}.{:03}{:03}]", timestamp.as_secs(), timestamp_us / 1000, timestamp_us % 1000)
 	};
 	($fmt:expr) => ({
 		use crate::time::TimeCounter;
 		let timestamp = crate::time::time_counter().uptime();
 		let timestamp_us = timestamp.subsec_micros();
-		println!(concat!("[{:>5}.{:03}{:03}] ", $fmt), timestamp.as_secs(), timestamp_us / 1000, timestamp_us % 1000)
+		$crate::println!(concat!("[{:>5}.{:03}{:03}] ", $fmt), timestamp.as_secs(), timestamp_us / 1000, timestamp_us % 1000)
 	});
 	($fmt:expr, $($args:tt)+) => ({
 		use crate::time::TimeCounter;
 		let timestamp = crate::time::time_counter().uptime();
 		let timestamp_us = timestamp.subsec_micros();
-		println!(concat!("[{:>5}.{:03}{:03}] ", $fmt), timestamp.as_secs(), timestamp_us / 1000, timestamp_us % 1000, $($args)+)
+		$crate::println!(concat!("[{:>5}.{:03}{:03}] ", $fmt), timestamp.as_secs(), timestamp_us / 1000, timestamp_us % 1000, $($args)+)
 	});
 }

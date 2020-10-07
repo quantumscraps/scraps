@@ -2,7 +2,7 @@ use crate::lock::Lock;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
-/// A mutex based on the locking primitives in [lock].
+/// A mutex based on the locking primitives in [crate::lock].
 pub struct Mutex<T> {
     lock: Lock,
     value: T,

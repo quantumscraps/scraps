@@ -28,5 +28,4 @@ SECTIONS
     }
     PROVIDE(_stack = _bss_end + 0x80000);
     PROVIDE(_heap_start = _stack);
-    PROVIDE(_heap_size = _memory_end - _stack);
 }
