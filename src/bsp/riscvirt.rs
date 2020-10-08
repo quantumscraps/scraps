@@ -13,3 +13,6 @@ pub static UART: Mutex<NS16550A> = Mutex::new(NS16550A::new(0x1000_0000));
 pub const TICKS_PER_NANO: u64 = 3; // 10 / 4 ~= 3, should probably add floats though
 pub const NANOS_PER_TICK: u64 = 1;
 pub const HAS_RDTIME: bool = false;
+
+pub const HEAP_SIZE: usize = 0x100000; // PAGE_SIZE * 1048576; // 1m allocations
+pub const PAGE_SIZE: usize = 4096;

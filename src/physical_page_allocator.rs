@@ -1,12 +1,9 @@
+pub use crate::bsp::{HEAP_SIZE, PAGE_SIZE};
 use crate::{link_var, print, println};
 use crate::{mutex::Mutex, printk};
 use core::alloc::GlobalAlloc;
 
 link_var!(_heap_start);
-
-// TODO: make these arch / board specific.
-const HEAP_SIZE: usize = 0x100000; // PAGE_SIZE * 1048576; // 1m allocations
-pub const PAGE_SIZE: usize = 4096;
 
 // const_evalutable_checked cannot evaluate this expression inline yet.
 const fn pages_subdivide(size: usize) -> usize {
