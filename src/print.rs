@@ -2,7 +2,7 @@
 macro_rules! print {
 	($($args:tt)+) => ({
 			use core::fmt::Write;
-			let _ = write!(crate::bsp::UART.get(), $($args)+);
+			let _ = write!(crate::bsp::UART.lock(), $($args)+);
 	});
 }
 

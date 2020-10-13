@@ -16,8 +16,6 @@ mod bsp;
 mod cpu;
 mod driver_interfaces;
 mod drivers;
-mod lock;
-mod mutex;
 mod panic;
 mod physical_page_allocator;
 mod print;
@@ -46,7 +44,7 @@ macro_rules! link_var {
 // we need a mutex eventually
 #[no_mangle]
 pub unsafe extern "C" fn kernel_init(dtb_addr: *mut i8) -> ! {
-    bsp::UART.get().init();
+    bsp::UART.lock().init();
     let v = 12;
     printk!("dtb_addr = {:?}", dtb_addr);
     let r = dtb::Reader::read_from_address(dtb_addr as _);
@@ -59,28 +57,26 @@ pub unsafe extern "C" fn kernel_init(dtb_addr: *mut i8) -> ! {
     } else if let Err(e) = r {
         printk!("Failed to read dtb error = {:?}", e);
     }
-    // for testing ig
-    let _lock = lock::Lock::new();
     printk!("Address of some stack variable is {:?}", (&v as *const _));
     printk!(
         "Timer Accuracy: {} ns",
         time::time_counter().accuracy().as_nanos()
     );
     // init allocator
-    ALLOCATOR.get().default_init();
-    printk!("PPE = {:?}", ALLOCATOR.get().get_base() as *const i8);
+    ALLOCATOR.lock().default_init();
+    printk!("PPE = {:?}", ALLOCATOR.lock().get_base() as *const i8);
     printk!("Allocating 35 pages...");
-    let allocation = ALLOCATOR.get().try_allocate(35 * PAGE_SIZE);
+    let allocation = ALLOCATOR.lock().try_allocate(35 * PAGE_SIZE);
     if let Some(allocation) = allocation {
         printk!("Success! Allocation address = {:?}", allocation);
     } else {
         printk!("Failure...");
     }
-    ALLOCATOR.get().print_page_allocation_table();
+    ALLOCATOR.lock().print_page_allocation_table();
     if let Some(allocation) = allocation {
         printk!("Freeing allocation...");
-        ALLOCATOR.get().deallocate(allocation, 35 * PAGE_SIZE);
-        ALLOCATOR.get().print_page_allocation_table();
+        ALLOCATOR.lock().deallocate(allocation, 35 * PAGE_SIZE);
+        ALLOCATOR.lock().print_page_allocation_table();
     }
     // Allocate and reserve a vec
     printk!("Allocating a vec<string> and reserving 37 items, then pushing a bunch of strings...");
@@ -88,10 +84,10 @@ pub unsafe extern "C" fn kernel_init(dtb_addr: *mut i8) -> ! {
     for _ in 0..37 {
         v.push(String::from("testabc"));
     }
-    ALLOCATOR.get().print_page_allocation_table();
+    ALLOCATOR.lock().print_page_allocation_table();
     printk!("Dropping vec..");
     drop(v);
-    ALLOCATOR.get().print_page_allocation_table();
+    ALLOCATOR.lock().print_page_allocation_table();
     //printk!("Heap size = {}", _heap_size);
     loop {
         printk!("Hello, World!");
