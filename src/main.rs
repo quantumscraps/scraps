@@ -43,7 +43,7 @@ macro_rules! link_var {
 // still unsafe because mutable statics are unsafe !!
 // we need a mutex eventually
 #[no_mangle]
-pub unsafe extern "C" fn kernel_init(dtb_addr: *mut i8) -> ! {
+pub unsafe extern "C" fn kinit(dtb_addr: *mut i8) -> ! {
     bsp::UART.lock().init();
     let v = 12;
     printk!("dtb_addr = {:?}", dtb_addr);

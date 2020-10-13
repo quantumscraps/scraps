@@ -29,5 +29,5 @@ __early_entry:
 	str	xzr, [x5], #8   // if not then clear it
 	sub	w6, w6, #1      // decrement by 1
 	cbnz	w6, 3b          // go back
-4:	bl	kernel_init     // jump to kernel_init
+4:	bl	kinit           // jump to kernel_init
 	b	1b              // go back to wfe loop if fail

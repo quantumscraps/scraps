@@ -8,7 +8,7 @@ SECTIONS
         *(.text.init) *(.text .text.*)
         PROVIDE(__text_end = .);
     }
-    PROVIDE(_global_pointer = .);
+    PROVIDE(__global_pointer = .);
     .rodata : {
         PROVIDE(__rodata_start = .);
         *(.rodata .rodata.*)
@@ -26,6 +26,6 @@ SECTIONS
         *(.sbss .sbss.*) *(.bss .bss.*)
         PROVIDE(__bss_end = .);
     }
-    PROVIDE(__stack = _bss_end + 0x80000);
-    PROVIDE(__heap_start = _stack);
+    PROVIDE(__stack = __bss_end + 0x80000);
+    PROVIDE(__heap_start = __stack);
 }

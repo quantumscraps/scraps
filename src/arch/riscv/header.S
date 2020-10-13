@@ -21,12 +21,12 @@ _start:
     addi a0, a0, 8
     bltu a0, a1, 1b
 2:
-    la sp, _stack # setup stack pointer
+    la sp, __stack # setup stack pointer
     # enable interrupts basically
     li		t0, (0b11 << 11) | (1 << 7) | (1 << 3)
     csrw	mstatus, t0
     # location to jump to
-    la		t1, kernel_init
+    la		t1, kinit
     csrw	mepc, t1
     # trap vector
     la		t2, asm_trap_vector
