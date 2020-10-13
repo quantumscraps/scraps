@@ -1,8 +1,8 @@
-.section ".text._header"
+.section ".text._start"
 
-.global _header
+.global _start
 
-_header:
+_start:
 	add x13, x18, #0x16 // creates the "MZ" magic
 	b __early_entry     // branch to rest of code
 	.quad __start       // kernel entry point
@@ -20,7 +20,7 @@ __early_entry:
 1:	wfe                     // else stay in this wfe loop
 	b	1b
 2:
-	ldr	x5, =_header    // set up stack before kernel image
+	ldr	x5, =_start     // set up stack before kernel image
 	mov	sp, x5
 
 	ldr	x5, =__bss_start

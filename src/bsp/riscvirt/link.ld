@@ -4,28 +4,28 @@ SECTIONS
 {
     . = 0x80000000;
     .text : {
-        PROVIDE(_text_start = .);
+        PROVIDE(__text_start = .);
         *(.text.init) *(.text .text.*)
-        PROVIDE(_text_end = .);
+        PROVIDE(__text_end = .);
     }
     PROVIDE(_global_pointer = .);
     .rodata : {
-        PROVIDE(_rodata_start = .);
+        PROVIDE(__rodata_start = .);
         *(.rodata .rodata.*)
-        PROVIDE(_rodata_end = .);
+        PROVIDE(__rodata_end = .);
     }
     .data : {
         . = ALIGN(4096);
-        PROVIDE(_data_start = .);
+        PROVIDE(__data_start = .);
         *(.sdata .sdata.*) *(.data .data.*)
-        PROVIDE(_data_end = .);
+        PROVIDE(__data_end = .);
     }
     .bss : {
         . = ALIGN(8);
-        PROVIDE(_bss_start = .);
+        PROVIDE(__bss_start = .);
         *(.sbss .sbss.*) *(.bss .bss.*)
-        PROVIDE(_bss_end = .);
+        PROVIDE(__bss_end = .);
     }
-    PROVIDE(_stack = _bss_end + 0x80000);
-    PROVIDE(_heap_start = _stack);
+    PROVIDE(__stack = _bss_end + 0x80000);
+    PROVIDE(__heap_start = _stack);
 }

@@ -1,4 +1,4 @@
-ENTRY(_header)
+ENTRY(_start)
 
 SECTIONS
 {
@@ -7,7 +7,7 @@ SECTIONS
 	.text :
 	{
 
-		*(.text._header) *(.text*)
+		*(.text._start) *(.text*)
 	}
 
 	.rodata :
@@ -30,6 +30,7 @@ SECTIONS
 	__bss_size = __bss_end - __bss_start;
 	/* align to 8 because we clear out bss in u64 chunks */
 	__end = .;
+	__heap_start = .;
 	/DISCARD/ : { *(.comment*) *(.gnu) *(.note) *(.eh_frame*)}
 }
 __kernel_size = __end - __start;

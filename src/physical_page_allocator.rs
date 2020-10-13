@@ -4,7 +4,7 @@ use crate::{link_var, print, println};
 use core::alloc::GlobalAlloc;
 use spin::Mutex;
 
-link_var!(_heap_start);
+link_var!(__heap_start);
 
 // const_evalutable_checked cannot evaluate this expression inline yet.
 const fn pages_subdivide(size: usize) -> usize {
@@ -62,7 +62,7 @@ where
 
     /// Initializes based on _heap_start global constant.
     pub unsafe fn default_init(&mut self) {
-        let val = &_heap_start as *const _ as usize;
+        let val = &__heap_start as *const _ as usize;
         self.init(val);
     }
 

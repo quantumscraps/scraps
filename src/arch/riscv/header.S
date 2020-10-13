@@ -10,11 +10,11 @@ _start:
     csrw satp, zero
 .option push
 .option norelax
-    la gp, _global_pointer
+    la gp, __global_pointer
 
     # Zero out BSS
-    la a0, _bss_start
-    la a1, _bss_end
+    la a0, __bss_start
+    la a1, __bss_end
     bgeu a0, a1, 2f
 1:
     sd zero, (a0)

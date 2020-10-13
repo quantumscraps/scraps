@@ -1,6 +1,7 @@
 use crate::drivers::pl011::PL011;
+use spin::Mutex;
 
-pub static mut UART: PL011 = PL011::new();
+pub static UART: Mutex<PL011> = Mutex::new(PL011::new());
 
 pub fn mmio_base() -> usize {
     unsafe {
@@ -17,3 +18,6 @@ pub fn mmio_base() -> usize {
         }
     }
 }
+
+pub const HEAP_SIZE: usize = 0x100000; // PAGE_SIZE * 1048576; // 1m allocations
+pub const PAGE_SIZE: usize = 4096;
