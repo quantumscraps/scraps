@@ -99,12 +99,10 @@ def generate_vscode(board):
     features = build_dict.get("features")
     settings = {
         "rust-analyzer.cargo.features": features,
-        "rust-analyzer.cargo.target": target,
+        "rust-analyzer.cargo.noDefaultFeatures": True,
         "rust-analyzer.checkOnSave.allTargets": False,
-        "rust-analyzer.checkOnSave.extraArgs": [
-            "--target",
-            target,
-        ],
+        "rust-analyzer.cargo.target": target,
+        "rust-analyzer.cargo.allFeatures": False,
     }
     vspath = Path(".vscode")
     vspath.mkdir(parents=True, exist_ok=True)
