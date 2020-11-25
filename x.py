@@ -128,10 +128,8 @@ Or {sys.argv[0]} generate-vscode <board name>
 def main():
     if len(sys.argv) < 2:
         usage()
-        return
     if sys.argv[1] == "list-boards":
         list_boards()
-        return
     elif sys.argv[1] == "build" and len(sys.argv) == 3:
         build(sys.argv[2])
     elif sys.argv[1] == "run" and len(sys.argv) == 3:
@@ -140,11 +138,8 @@ def main():
         debug(sys.argv[2])
     elif sys.argv[1] == "generate-vscode" and len(sys.argv) == 3:
         generate_vscode(sys.argv[2])
-        return
     elif sys.argv[1] == "clean":
         clean()
-        return
     else:
         usage()
-        return
 main()
