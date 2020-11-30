@@ -54,6 +54,33 @@ def build(board, debug=False):
     else:
         print(":( failure")
         return False
+def binary(board):
+    print(f"Building for {board}")
+    if not build(board):
+        return
+    bsp = Path("src/bsp")
+    build_json = bsp / board / "build.json"
+    bf = open(build_json)
+    build_dict = json.load(bf)
+    bf.close()
+    kernel_name = build_dict.get("kernel_name")
+    target = build_dict.get("target")
+    executable = Path("target") / target / "release" / NAME;
+    kernels = Path("obj")
+    if not kernels.exists():
+        print("Creating `obj`")
+        os.mkdir("obj")
+    
+    cmd = ["rust-objcopy", "-Obinary", str(executable), str(kernels / kernel_name)]
+    print(f"executing: {' '.join(cmd)}")
+    p = subprocess.Popen(cmd)
+    p.communicate()
+    if p.returncode == 0:
+        print(":) success")
+        return True
+    else:
+        print(":( failure")
+        return False
 def run(board):
     print(f"Building for {board}")
     if not build(board):
@@ -110,11 +137,18 @@ def generate_vscode(board):
         json.dump(settings, f)
     print(f"Written settings to .vscode/settings.json")
 def clean():
-    pth = Path("target")
-    if pth.exists():
-        print("cleaning...")
+    target = Path("target")
+    kernels = Path("kernels")
+    cleaned = False
+    if target.exists():
+        print("cleaning target...")
         shutil.rmtree("target")
-    else:
+        cleaned = True
+    if kernels.exists():
+        print("cleaning kernels...")
+        shutil.rmtree("kernels")
+        cleaned = True
+    if not cleaned:
         print("nothing to do")
 def usage():
     err(f"""
@@ -132,6 +166,8 @@ def main():
         list_boards()
     elif sys.argv[1] == "build" and len(sys.argv) == 3:
         build(sys.argv[2])
+    elif sys.argv[1] == "binary" and len(sys.argv) == 3:
+        binary(sys.argv[2])
     elif sys.argv[1] == "run" and len(sys.argv) == 3:
         run(sys.argv[2])
     elif sys.argv[1] == "debug" and len(sys.argv) == 3:

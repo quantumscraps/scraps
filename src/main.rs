@@ -6,6 +6,7 @@
 #![feature(const_panic)]
 #![feature(default_alloc_error_handler)]
 #![feature(label_break_value)]
+#![feature(naked_functions)]
 #![allow(incomplete_features)]
 #![no_main]
 #![no_std]
@@ -21,6 +22,7 @@ mod physical_page_allocator;
 mod print;
 mod time;
 mod util;
+mod mmu;
 
 use crate::time::TimeCounter;
 use alloc::string::String;
@@ -44,16 +46,24 @@ macro_rules! link_var {
 // we need a mutex eventually
 #[no_mangle]
 pub unsafe extern "C" fn kinit(dtb_addr: *mut i8) -> ! {
-    bsp::UART.lock().init();
+    mmu::init();
+    bsp::UNSAFE_UART.init();
     let v = 12;
     printk!("dtb_addr = {:?}", dtb_addr);
     let r = dtb::Reader::read_from_address(dtb_addr as _);
     if let Ok(r) = r {
-        for item in r.struct_items() {
+        /*for item in r.struct_items() {
             if let Ok(name) = item.name() {
                 printk!("Name = {}", name);
             }
+        }*/
+        for entry in r.reserved_mem_entries() {
+            printk!("reserved: {:?}, {:?}", entry.address, entry.size);
         }
+        /*if let Some((cmdline, _)) = r.struct_items().path_struct_items("/chosen/bootargs").next() {
+            println!("[cmdline] {}", cmdline.value_str().unwrap());
+        }*/
+
     } else if let Err(e) = r {
         printk!("Failed to read dtb error = {:?}", e);
     }

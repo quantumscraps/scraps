@@ -1,3 +1,4 @@
 /target
+/obj
 Cargo.lock
 .vscode

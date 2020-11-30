@@ -2,7 +2,9 @@
 macro_rules! print {
 	($($args:tt)+) => ({
 			use core::fmt::Write;
-			let _ = write!(crate::bsp::UART.lock(), $($args)+);
+			unsafe {
+			let _ = write!(crate::bsp::UNSAFE_UART, $($args)+);
+			}
 	});
 }
 

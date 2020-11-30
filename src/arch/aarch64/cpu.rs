@@ -1,22 +1,13 @@
 global_asm!(include_str!("header.S"));
-
+use cortex_a::asm;
 #[inline(always)]
 pub fn wait_forever() -> ! {
-    unsafe {
-        loop {
-            #[rustfmt::skip]
-            asm!(
-                "wfe",
-                options(nomem, nostack, preserves_flags)
-            );
-        }
+    loop {
+        asm::wfe();
     }
 }
 
-#[inline(always)]
-pub fn nop() {
-    unsafe { asm!("nop") }
-}
+pub use asm::nop;
 
 #[inline(always)]
 pub fn spin_for_cycles(n: usize) {
