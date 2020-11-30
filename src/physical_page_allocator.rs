@@ -1,5 +1,4 @@
 pub use crate::bsp::{HEAP_SIZE, PAGE_SIZE};
-use crate::printk;
 use crate::{link_var, print, println};
 use core::alloc::GlobalAlloc;
 use spin::Mutex;
@@ -93,6 +92,7 @@ where
                 }
                 if matching >= pages {
                     // note: ra marks this as an error but it's actually fine
+                    // (see rust-analyzer#4747)
                     // due to #![feature(label_break_value)]
                     break 'block Some(begin_index);
                 }

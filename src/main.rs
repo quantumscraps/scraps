@@ -2,13 +2,16 @@
 #![feature(global_asm)]
 #![feature(const_fn)]
 #![feature(const_generics)]
-#![feature(const_evaluatable_checked)] // NOTE: const_evalutable_unchecked isn't a thing !!
+#![feature(const_evaluatable_checked)] // NOTE: const_evaluatable_unchecked isn't a thing !!
 #![feature(const_panic)]
 #![feature(default_alloc_error_handler)]
 #![feature(label_break_value)]
 #![allow(incomplete_features)]
+#![deny(missing_docs)]
 #![no_main]
 #![no_std]
+
+//! Scraps of an operating system
 
 extern crate alloc;
 
@@ -40,8 +43,8 @@ macro_rules! link_var {
     }
 }
 
-// still unsafe because mutable statics are unsafe !!
-// we need a mutex eventually
+/// The early entry point for initializing the OS.
+/// Paging, DTB, etc. are setup here.
 #[no_mangle]
 pub unsafe extern "C" fn kinit(dtb_addr: *mut i8) -> ! {
     bsp::UART.lock().init();
