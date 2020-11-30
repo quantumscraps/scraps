@@ -1,3 +1,4 @@
+/// See [std::print].
 #[macro_export]
 macro_rules! print {
 	($($args:tt)+) => ({
@@ -8,6 +9,7 @@ macro_rules! print {
 	});
 }
 
+/// See [std::println].
 #[macro_export]
 macro_rules! println {
 	() => ({
@@ -21,6 +23,7 @@ macro_rules! println {
 	});
 }
 
+/// Similar to [std::println] but prints with a timestamp.
 #[macro_export]
 macro_rules! printk {
 	() => {

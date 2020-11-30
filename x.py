@@ -130,11 +130,16 @@ def generate_vscode(board):
         "rust-analyzer.checkOnSave.allTargets": False,
         "rust-analyzer.cargo.target": target,
         "rust-analyzer.cargo.allFeatures": False,
+        "rust-analyzer.diagnostics.disabled": [
+            # required until rust-analyzer implements support for
+            # #![feature(break_label_value)]
+            "break-outside-of-loop"
+        ]
     }
     vspath = Path(".vscode")
     vspath.mkdir(parents=True, exist_ok=True)
     with open(".vscode/settings.json", "w") as f:
-        json.dump(settings, f)
+        json.dump(settings, f, indent=4)
     print(f"Written settings to .vscode/settings.json")
 def clean():
     target = Path("target")
