@@ -1,5 +1,8 @@
 global_asm!(include_str!("header.S"));
-use cortex_a::asm;
+use cortex_a::{asm, regs::*};
+use crate::{memory, link_var};
+
+link_var!(__start);
 #[inline(always)]
 pub fn wait_forever() -> ! {
     loop {
@@ -14,4 +17,64 @@ pub fn spin_for_cycles(n: usize) {
     for _ in 0..n {
         nop();
     }
+}
+#[inline(always)]
+pub fn core_num() -> u8 {
+    // technically there can be 255 cores per clusters and 255 clusters,
+    // but for now we're just assuming there's one cluster
+    (MPIDR_EL1.get() & 0xFF) as u8
+}
+
+#[naked]
+#[inline(always)]
+#[no_mangle]
+pub unsafe fn __early_entry() -> ! {
+    if core_num() != 0 {
+        wait_forever()
+    }
+    match CurrentEL.get() >> 2 {
+        3 => el3_to_el2(),
+        2 => el2_to_el1(),
+        _ => wait_forever()
+    }
+}
+
+#[inline(always)]
+unsafe fn el2_to_el1() -> ! {
+    // grant Counting and Timer for EL1
+    CNTHCTL_EL2.write(CNTHCTL_EL2::EL1PCTEN::SET + CNTHCTL_EL2::EL1PCEN::SET);
+
+    // Counter-timer Virtual Offset = 0
+    CNTVOFF_EL2.set(0);
+
+    // Enable aarch64 (not aarch32, since that's an option!)
+    HCR_EL2.write(HCR_EL2::RW::EL1IsAarch64);
+
+    // Set the Debug exception mask, SError interrupt mask, IRQ interrupt mask, FIQ interrupt mask, and EL1h for selected stack pointer
+    SPSR_EL2.write(SPSR_EL2::D::Masked + SPSR_EL2::A::Masked + SPSR_EL2::I::Masked + SPSR_EL2::F::Masked + SPSR_EL2::M::EL1h);
+
+    // Set the link register to the correct location (this will execute after exception return)
+    ELR_EL2.set(memory::setup_environment as *const () as u64);
+
+    // Set up the Stack Pointer
+    SP_EL1.set(&__start as *const _ as u64);
+
+    // Perform exception return
+    asm::eret()
+}
+
+#[inline(always)]
+unsafe fn el3_to_el2() -> ! {
+    // This is RW bit + Hypervisor Call Enable + Non-secure bit. I'll open a PR in cortex-a to add HCE
+    SCR_EL3.set(0x5b1);
+
+    // Set the Debug exception mask, SError interrupt mask, IRQ interrupt mask, FIQ interrupt mask, and EL2h for selected stack pointer
+    //SPSR_EL3.write(SPSR_EL3::D::Masked + SPSR_EL3::A::Masked + SPSR_EL3::I::Masked + SPSR_EL3::F::Masked + SPSR_EL3::M::EL2h);
+    //TODO: why does this say use of undeclared type??? the following does essentially the same thing
+    SPSR_EL3.set(0x3c9);
+    // Set up the link register to run the el2 to el1 drop
+    ELR_EL3.set(el2_to_el1 as *const () as u64);
+
+    // Perform exception return
+    asm::eret()
 }
