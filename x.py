@@ -143,15 +143,15 @@ def generate_vscode(board):
     print(f"Written settings to .vscode/settings.json")
 def clean():
     target = Path("target")
-    kernels = Path("kernels")
+    kernels = Path("obj")
     cleaned = False
     if target.exists():
         print("cleaning target...")
         shutil.rmtree("target")
         cleaned = True
     if kernels.exists():
-        print("cleaning kernels...")
-        shutil.rmtree("kernels")
+        print("cleaning obj...")
+        shutil.rmtree("obj")
         cleaned = True
     if not cleaned:
         print("nothing to do")
