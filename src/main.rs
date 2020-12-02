@@ -20,6 +20,7 @@ mod bsp;
 mod cpu;
 mod driver_interfaces;
 mod drivers;
+mod memory;
 mod panic;
 mod physical_page_allocator;
 mod print;
