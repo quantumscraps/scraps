@@ -32,9 +32,9 @@ pub unsafe fn __early_entry() -> ! {
     if core_num() != 0 {
         wait_forever()
     }
-    match CurrentEL.get() >> 2 {
-        3 => el3_to_el2(),
-        2 => el2_to_el1(),
+    match CurrentEL.get() & 0b11_00 {
+        0b11_00 => el3_to_el2(),
+        0b10_00 => el2_to_el1(),
         _ => wait_forever()
     }
 }
