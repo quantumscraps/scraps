@@ -3,8 +3,9 @@
 macro_rules! print {
 	($($args:tt)+) => ({
 			use core::fmt::Write;
+			#[allow(unused_unsafe)]
 			unsafe {
-			let _ = write!(crate::bsp::UNSAFE_UART, $($args)+);
+				let _ = write!(crate::bsp::UNSAFE_UART, $($args)+);
 			}
 	});
 }

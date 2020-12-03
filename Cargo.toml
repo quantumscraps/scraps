@@ -9,7 +9,7 @@ edition = "2018"
 lto = true
 
 [dependencies]
-dtb = "0.2"
+fdt-rs = { version = "0.4", default-features = false }
 spin = "0.6"
 register = "1.0"
 cortex-a = { version = "5.0", optional = true }

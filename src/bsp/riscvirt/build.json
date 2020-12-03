@@ -18,6 +18,8 @@
 		"stdio",
 		"-bios",
 		"none",
+		"-append",
+		"stuff,cmdline,yay",
 		"-kernel"
 	]
 }

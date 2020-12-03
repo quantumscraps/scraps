@@ -12,6 +12,9 @@ _start:
 .option norelax
     la gp, __global_pointer
 
+    # Save DTB
+    add t5, a1, zero
+
     # Zero out BSS
     la a0, __bss_start
     la a1, __bss_end
@@ -37,6 +40,8 @@ _start:
     # 1 << 11 = external interrupt
     li		t3, (1 << 3) | (1 << 7) | (1 << 11)
     csrw	mie, t3
+    # restore DTB
+    add a0, t5, zero
     # Return to wfi loop
     la		ra, 4f
     # perform return

@@ -83,6 +83,13 @@ where
         let mut matching = 0;
         let begin_index: Option<usize> = 'block: {
             for (i, entry) in self.descriptors.iter().enumerate() {
+                // printk!(
+                //     "Trying entry #{} begin: {} matching: {} needed: {}",
+                //     i,
+                //     begin_index,
+                //     matching,
+                //     pages
+                // );
                 let flags = *entry;
                 if flags & PageFlags::Free.val() != 0 {
                     matching += 1;
@@ -94,12 +101,14 @@ where
                     // note: ra marks this as an error but it's actually fine
                     // (see rust-analyzer#4747)
                     // due to #![feature(label_break_value)]
+                    //printk!("Success!");
                     break 'block Some(begin_index);
                 }
             }
             None
         };
         if let Some(begin_index) = begin_index {
+            //printk!("begin_index is found");
             // Mark all descriptors as taken and return value.
             for descriptor in self.descriptors[begin_index..=begin_index + pages].iter_mut() {
                 *descriptor = (*descriptor) & !PageFlags::Free.val() | PageFlags::Taken.val();
