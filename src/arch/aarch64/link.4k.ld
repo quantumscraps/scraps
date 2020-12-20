@@ -2,7 +2,8 @@ ENTRY(_start)
 
 SECTIONS
 {
-	. = 0xffffff80_00000000;
+	. = 0xffff0000_00000000;
+	/* 48 bit VA, just dump our kernel at the start for now */
 	__start = .;
 	__ro_start = .;
 	.text :
