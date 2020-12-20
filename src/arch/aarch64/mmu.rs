@@ -1,13 +1,30 @@
 use cortex_a::{barrier, regs::*};
 
-#[naked]
 #[inline(never)]
 pub unsafe fn init() {
-    /*
-    // Initialize the Translation Control Register
-    TCR_EL1.write(TCR_EL1::TG1::KiB_4 // 4 KiB granule size 
-        + TCR_EL1::IPS::Bits_48 // 48 bit addresses (256TiB address space)
+    // Layout we use here:
+    // 4 KiB pages, 4 levels (48 bit address space, 256 TiB address space split between lower and higher half)
+    // I'll have to make a 16 KiB, 3 levels 47? bit address space later
 
-    )
-    */
+
+    // Initialize the Translation Control Register
+    TCR_EL1.write(
+        TCR_EL1::TG1::KiB_4 // 64 KiB granule size for kernel space
+        + TCR_EL1::IPS::Bits_48 // 48 bit addresses (256TiB address space)
+        + TCR_EL1::T1SZ.val(17) // 2^(64-17) = 2^47 which is half of 2^48
+        + TCR_EL1::TG0::KiB_4 // 64 KiB granule size for user space
+        + TCR_EL1::T0SZ.val(17) // ditto for T1SZ lul
+        + TCR_EL1::TBI0::Ignored // Ignore top byte of VA
+        + TCR_EL1::ORGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable // Outer Cacheability attribute
+        + TCR_EL1::IRGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable // Inner Cacheability attribute
+        + TCR_EL1::EPD0::EnableTTBR0Walks // self explanatory
+        + TCR_EL1::EPD1::EnableTTBR1Walks // self explanatory
+        + TCR_EL1::SH1::Inner // inner shareability for TTBR1
+        + TCR_EL1::SH0::Inner // outer shareability for TTBR0
+    );
+
+    // Initialize Memory Attributes
+    /*MAIR_EL1.write(
+
+    );*/
 }

@@ -2,12 +2,11 @@ ENTRY(_start)
 
 SECTIONS
 {
-	. = 0x80000;
+	. = 0xffffff80_00000000;
 	__start = .;
 	__ro_start = .;
 	.text :
 	{
-
 		*(.text._start) *(.text*)
 	}
 
@@ -32,6 +31,7 @@ SECTIONS
 	__bss_size = __bss_end - __bss_start;
 	/* align to 8 because we clear out bss in u64 chunks */
 	. = ALIGN(4096);
+	/* page align the end too!!! */
 	__end = .;
 	__heap_start = .;
 	/DISCARD/ : { *(.comment*) *(.gnu) *(.note) *(.eh_frame*)}
