@@ -24,17 +24,23 @@ pub fn core_num() -> u8 {
     // but for now we're just assuming there's one cluster
     (MPIDR_EL1.get() & 0xFF) as u8
 }
-
-#[naked]
+#[inline(always)]
+pub fn cluster_num() -> u8 {
+    ((MPIDR_EL1.get() >> 8) & 0xFF) as u8
+}
 #[inline(always)]
 #[no_mangle]
 pub unsafe fn __early_entry() -> ! {
+    if cluster_num() != 0 {
+        wait_forever()
+    }
     if core_num() != 0 {
         wait_forever()
     }
     match CurrentEL.get() & 0b11_00 {
         0b11_00 => el3_to_el2(),
         0b10_00 => el2_to_el1(),
+        0b01_00 => asm!("b setup_environment", options(nomem, nostack, preserves_flags, noreturn)),
         _ => wait_forever()
     }
 }
