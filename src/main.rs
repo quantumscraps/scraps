@@ -97,7 +97,7 @@ pub fn lookup_dtb_entry<'dt>(
 /// The early entry point for initializing the OS.
 /// Paging, DTB, etc. are setup here.
 #[no_mangle]
-pub unsafe extern "C" fn kinit(dtb_addr: *mut i8) -> ! {
+pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     mmu::init();
     bsp::UNSAFE_UART.init();
     let v = 12;

@@ -11,7 +11,7 @@ const fn usize_subdivide(size: usize) -> usize {
 }
 
 #[no_mangle]
-pub unsafe fn setup_environment(dtb_addr: *mut i8) -> ! {
+pub unsafe fn setup_environment(dtb_addr: *mut u8) -> ! {
     // get bss section as slice
     let mut slice = core::slice::from_raw_parts_mut(
         &__bss_start as *const _ as *mut usize,

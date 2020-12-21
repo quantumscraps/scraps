@@ -29,6 +29,5 @@ pub unsafe fn init() {
         + MAIR_EL1::Attr1_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc // Ditto for Outer
         + MAIR_EL1::Attr0_Device::nonGathering_nonReordering_EarlyWriteAck
     );
-
-
+    
 }
