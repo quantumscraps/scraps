@@ -81,6 +81,30 @@ def binary(board):
     else:
         print(":( failure")
         return False
+def objdump(board):
+    print(f"assembly for {board}")
+    if not build(board):
+        return
+    bsp = Path("src/bsp")
+    build_json = bsp / board / "build.json"
+    bf = open(build_json)
+    build_dict = json.load(bf)
+    bf.close()
+    kernel_name = build_dict.get("kernel_name")
+    target = build_dict.get("target")
+    executable = Path("target") / target / "release" / NAME;
+    
+    cmd = ["rust-objdump", "--disassemble", "--demangle", str(executable)]
+    print(f"executing: {' '.join(cmd)}")
+    p = subprocess.Popen(cmd)
+    p.communicate()
+    if p.returncode == 0:
+        print(":) success")
+        return True
+    else:
+        print(":( failure")
+        return False
+
 def run(board):
     print(f"Building for {board}")
     if not build(board):
@@ -159,6 +183,8 @@ def usage():
     err(f"""
 Usage: {sys.argv[0]} build <board name>
 Or {sys.argv[0]} run <board name>
+Or {sys.argv[0]} binary <board name>
+Or {sys.argv[0]} objdump <board name>
 Or {sys.argv[0]} debug <board name> (starts gdbserver on localhost:1234)
 Or {sys.argv[0]} list-boards
 Or {sys.argv[0]} clean
@@ -173,6 +199,8 @@ def main():
         build(sys.argv[2])
     elif sys.argv[1] == "binary" and len(sys.argv) == 3:
         binary(sys.argv[2])
+    elif sys.argv[1] == "objdump" and len(sys.argv) == 3:
+        objdump(sys.argv[2])
     elif sys.argv[1] == "run" and len(sys.argv) == 3:
         run(sys.argv[2])
     elif sys.argv[1] == "debug" and len(sys.argv) == 3:
