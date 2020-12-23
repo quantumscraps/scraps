@@ -26,7 +26,7 @@ mod panic;
 mod physical_page_allocator;
 mod print;
 mod time;
-mod util;
+//mod util;
 
 use crate::time::TimeCounter;
 use alloc::string::String;

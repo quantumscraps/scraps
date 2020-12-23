@@ -1,4 +1,4 @@
-use crate::driver_interfaces::*;
+use crate::driver_interfaces::Uart;
 use crate::{bsp, cpu};
 use register::{mmio::*, register_bitfields, register_structs};
 register_bitfields! {
