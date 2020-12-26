@@ -84,4 +84,11 @@ pub unsafe fn init() {
         + TCR_EL1::SH0::Inner      // Inner shareability lower half
         + TCR_EL1::SH1::Inner      // Inner shareability upper half
     );
+    
+    // Define 0 as normal cacheable DRAM and 1 as device/mmio
+    MAIR_EL1.write(
+        MAIR_EL1::Attr0_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc   // Outer DRAM Cacheability
+        + MAIR_EL1::Attr0_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc // Ditto for inner
+        + MAIR_EL1::Attr1_Device::nonGathering_nonReordering_EarlyWriteAck    // MMIO
+    );
 }
