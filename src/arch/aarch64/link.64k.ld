@@ -15,7 +15,7 @@ SECTIONS
 	{
 		*(.rodata*)
 	}
-	. = ALIGN(4096);
+	. = ALIGN(0x10000);
 	__ro_end = .;
 	.data :
 	{
@@ -31,7 +31,7 @@ SECTIONS
 	}
 	__bss_size = __bss_end - __bss_start;
 	/* align to 8 because we clear out bss in u64 chunks */
-	. = ALIGN(4096);
+	. = ALIGN(0x10000);
 	/* page align the end too!!! */
 	__end = .;
 	__heap_start = .;
