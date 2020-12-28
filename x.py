@@ -92,7 +92,7 @@ def objdump(board):
     bf.close()
     kernel_name = build_dict.get("kernel_name")
     target = build_dict.get("target")
-    executable = Path("target") / target / "release" / NAME;
+    executable = Path("target") / target / "release" / NAME
     
     cmd = ["rust-objdump", "--disassemble", "--demangle", str(executable)]
     print(f"executing: {' '.join(cmd)}")
@@ -117,9 +117,10 @@ def run(board):
     runcmd = build_dict.get("runcmd")
     target = build_dict.get("target")
     runcmd.append(f"target/{target}/release/{NAME}")
+    runcmd.extend(sys.argv)
     print(f"Running {' '.join(runcmd)}")
     try:
-        subprocess.check_call(runcmd)
+        subprocess.check_call(runcmd, stderr=sys.stderr, stdout=sys.stdout, stdin=sys.stdin)
     except KeyboardInterrupt:
         print("Exited on interrupt (^C)")
 def debug(board):
@@ -135,6 +136,7 @@ def debug(board):
     target = build_dict.get("target")
     runcmd.append(f"target/{target}/debug/{NAME}")
     runcmd.extend(["-s", "-S"])
+    runcmd.extend(sys.argv)
     print(f"Running {' '.join(runcmd)}")
     try:
         subprocess.check_call(runcmd)
@@ -179,7 +181,7 @@ def clean():
         cleaned = True
     if not cleaned:
         print("nothing to do")
-def usage():
+def usage(exe: str):
     err(f"""
 Usage: {sys.argv[0]} build <board name>
 Or {sys.argv[0]} run <board name>
@@ -189,26 +191,30 @@ Or {sys.argv[0]} debug <board name> (starts gdbserver on localhost:1234)
 Or {sys.argv[0]} list-boards
 Or {sys.argv[0]} clean
 Or {sys.argv[0]} generate-vscode <board name>
+
+Any additional arguments are passed to QEMU.
 """)
 def main():
-    if len(sys.argv) < 2:
-        usage()
-    if sys.argv[1] == "list-boards":
+    exe = sys.argv.pop(0)
+    if len(sys.argv) < 1:
+        usage(exe)
+    subcommand = sys.argv.pop(0)
+    if subcommand == "list-boards":
         list_boards()
-    elif sys.argv[1] == "build" and len(sys.argv) == 3:
-        build(sys.argv[2])
-    elif sys.argv[1] == "binary" and len(sys.argv) == 3:
-        binary(sys.argv[2])
-    elif sys.argv[1] == "objdump" and len(sys.argv) == 3:
-        objdump(sys.argv[2])
-    elif sys.argv[1] == "run" and len(sys.argv) == 3:
-        run(sys.argv[2])
-    elif sys.argv[1] == "debug" and len(sys.argv) == 3:
-        debug(sys.argv[2])
-    elif sys.argv[1] == "generate-vscode" and len(sys.argv) == 3:
-        generate_vscode(sys.argv[2])
-    elif sys.argv[1] == "clean":
+    elif subcommand == "build":
+        build(sys.argv.pop(0))
+    elif subcommand == "binary":
+        binary(sys.argv.pop(0))
+    elif subcommand == "objdump":
+        objdump(sys.argv.pop(0))
+    elif subcommand == "run":
+        run(sys.argv.pop(0))
+    elif subcommand == "debug":
+        debug(sys.argv.pop(0))
+    elif subcommand == "generate-vscode":
+        generate_vscode(sys.argv.pop(0))
+    elif subcommand == "clean":
         clean()
     else:
-        usage()
+        usage(exe)
 main()

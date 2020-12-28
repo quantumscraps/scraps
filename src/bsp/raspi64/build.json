@@ -2,7 +2,20 @@
 	"name": "raspi64",
 	"target": "aarch64-unknown-none-softfloat",
 	"kernel_name": "kernel8.img",
-	"rustflags": ["-C target-cpu=cortex-a53"],
-	"features": ["bsp_raspi64"],
-	"runcmd": ["qemu-system-aarch64", "-M", "raspi3", "-display", "none", "-serial", "stdio", "-kernel"]
+	"rustflags": [
+		"-C target-cpu=cortex-a53"
+	],
+	"features": [
+		"bsp_raspi64"
+	],
+	"runcmd": [
+		"qemu-system-aarch64",
+		"-M",
+		"raspi3",
+		"-display",
+		"none",
+		"-serial",
+		"stdio",
+		"-kernel"
+	]
 }
