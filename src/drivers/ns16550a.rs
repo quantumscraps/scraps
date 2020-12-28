@@ -41,7 +41,7 @@ register_bitfields! {
 
 register_structs! {
     #[allow(non_snake_case)]
-    pub uart {
+    pub UARTBlock {
         (0x00 => RBR: ReadWrite<u8>), // Can't easily make 2 registers for the same address unfortunately (both reading and writing takes place here, in addition to half of the divisor value)
         (0x01 => IER: ReadWrite<u8, IER::Register>),
         (0x02 => FCR: WriteOnly<u8, FCR::Register>),
@@ -59,6 +59,10 @@ impl NS16550A {
     pub const fn new(base_address: usize) -> Self {
         Self { base_address }
     }
+
+    unsafe fn regs(&mut self) -> &UARTBlock {
+        &*(self.base_address as *const UARTBlock)
+    }
 }
 
 impl core::fmt::Write for NS16550A {
@@ -72,42 +76,38 @@ impl core::fmt::Write for NS16550A {
 
 impl Uart for NS16550A {
     unsafe fn init(&mut self) {
-        let regs = self.base_address as *const uart;
+        let regs = self.regs();
         // Word length = 8 bits
-        (*regs).LCR.write(LCR::WLS::EightBits);
+        regs.LCR.write(LCR::WLS::EightBits);
         // Enable FIFO
-        (*regs).FCR.write(FCR::FEN::SET);
+        regs.FCR.write(FCR::FEN::SET);
         // Enable receiver buffer interrupts
-        (*regs).IER.write(IER::ERBFI::SET);
+        regs.IER.write(IER::ERBFI::SET);
         // Set the divisor to 2400 baud or whatever
         // doesn't really do anything in qemu
         // open the DLB to set divisor
         // formula for finding divisor is in the datasheet
         // Assume 22.729 MHz clock
-        (*regs).LCR.write(LCR::DLAB::SET + LCR::WLS::EightBits);
+        regs.LCR.write(LCR::DLAB::SET + LCR::WLS::EightBits);
         let divisor = 592u16;
-        (*regs).RBR.set((divisor & 0xFF) as u8);
-        (*regs).IER.set((divisor >> 8 & 0xff) as u8);
+        regs.RBR.set((divisor & 0xFF) as u8);
+        regs.IER.set((divisor >> 8 & 0xff) as u8);
         // close the DLB for normal use
-        (*regs).LCR.write(LCR::WLS::EightBits);
+        regs.LCR.write(LCR::WLS::EightBits);
     }
 
     fn get(&mut self) -> Option<u8> {
-        let regs = self.base_address as *const uart;
-        unsafe {
-            // check if data is ready
-            match (*regs).LSR.matches_all(LSR::DR::SET) {
-                true => Some((*regs).RBR.get()),
-                false => None,
-            }
+        let regs = unsafe { self.regs() };
+        // check if data is ready
+        match regs.LSR.matches_all(LSR::DR::SET) {
+            true => Some(regs.RBR.get()),
+            false => None,
         }
     }
 
     fn put(&mut self, value: u8) {
-        let regs = self.base_address as *const uart;
-        unsafe {
-            // just set the value
-            (*regs).RBR.set(value)
-        }
+        let regs = unsafe { self.regs() };
+        // just set the value
+        regs.RBR.set(value)
     }
 }
