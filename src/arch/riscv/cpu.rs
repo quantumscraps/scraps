@@ -13,6 +13,6 @@ pub fn wait_forever() -> ! {
     }
 }
 
-pub fn nop() {
-    unsafe { asm!("nop") }
-}
+// pub fn nop() {
+//     unsafe { asm!("nop") }
+// }
