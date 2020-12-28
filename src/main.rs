@@ -16,6 +16,7 @@
 
 extern crate alloc;
 
+mod arch;
 mod bsp;
 mod cpu;
 mod driver_interfaces;
