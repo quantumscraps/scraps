@@ -1,6 +1,6 @@
+use core::convert;
 use cortex_a::{barrier, regs::*};
 use register::{mmio::*, register_bitfields, InMemoryRegister};
-use core::convert;
 
 register_bitfields! {
     u64,
@@ -69,7 +69,7 @@ impl TempTranslationTables {
     const fn new() -> Self {
         Self {
             l3: [[TableDescriptor(0); 8192]; 8],
-            l2: [TableDescriptor(0); 8]
+            l2: [TableDescriptor(0); 8],
         }
     }
 }
@@ -87,8 +87,8 @@ impl convert::From<usize> for TableDescriptor {
         let temp: InMemoryRegister<u64, TABLE_DESC::Register> = InMemoryRegister::new(0);
         temp.write(
             TABLE_DESC::ADDR.val(addr as u64 >> 16)
-            + TABLE_DESC::TYPE::Table
-            + TABLE_DESC::VALID::True
+                + TABLE_DESC::TYPE::Table
+                + TABLE_DESC::VALID::True,
         );
         Self(temp.get())
     }
@@ -98,11 +98,11 @@ impl TableDescriptor {
         let temp: InMemoryRegister<u64, TABLE_DESC::Register> = InMemoryRegister::new(0);
         temp.write(
             TABLE_DESC::ADDR.val(addr as u64 >> 16)
-            + TABLE_DESC::AF::True
-            + TABLE_DESC::TYPE::Table
-            + TABLE_DESC::VALID::True
-            + TABLE_DESC::SH::OuterShareable
-            + TABLE_DESC::MemAttr.val(1)
+                + TABLE_DESC::AF::True
+                + TABLE_DESC::TYPE::Table
+                + TABLE_DESC::VALID::True
+                + TABLE_DESC::SH::OuterShareable
+                + TABLE_DESC::MemAttr.val(1),
         );
         Self(temp.get())
     }
@@ -133,14 +133,14 @@ pub unsafe fn init() {
         + TCR_EL1::EPD0::EnableTTBR0Walks // Self explanatory
         + TCR_EL1::EPD1::EnableTTBR1Walks // Self explanatory
         + TCR_EL1::SH0::Inner      // Inner shareability lower half
-        + TCR_EL1::SH1::Inner      // Inner shareability upper half
+        + TCR_EL1::SH1::Inner, // Inner shareability upper half
     );
 
     // Define 0 as normal cacheable DRAM and 1 as device/mmio
     MAIR_EL1.write(
         MAIR_EL1::Attr0_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc   // Outer DRAM Cacheability
         + MAIR_EL1::Attr0_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc // Ditto for inner
-        + MAIR_EL1::Attr1_Device::nonGathering_nonReordering_EarlyWriteAck    // MMIO
+        + MAIR_EL1::Attr1_Device::nonGathering_nonReordering_EarlyWriteAck, // MMIO
     );
 
     // For now just map 4 GiB address space as non cacheable using 512MiB blocks
@@ -165,9 +165,9 @@ pub unsafe fn init() {
     // Enable MMU
     barrier::isb(barrier::SY);
     SCTLR_EL1.modify(
-        SCTLR_EL1::M::Enable // Enable the MMU
-        + SCTLR_EL1::C::Cacheable // Enable data cache
-        + SCTLR_EL1::I::Cacheable // Enable instruction cache
+        SCTLR_EL1::M::Enable       // Enable the MMU
+        + SCTLR_EL1::C::Cacheable  // Enable data cache
+        + SCTLR_EL1::I::Cacheable, // Enable instruction cache
     );
     barrier::isb(barrier::SY);
 }

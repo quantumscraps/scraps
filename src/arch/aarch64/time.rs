@@ -14,9 +14,7 @@ impl time::TimeCounter for ARMv8Timer {
         Duration::from_nanos(1_000_000_000 / (CNTFRQ_EL0.get() as u64))
     }
     fn uptime(&self) -> Duration {
-        Duration::from_nanos(
-            (CNTPCT_EL0.get() as u64) * 1_000_000_000 / (CNTFRQ_EL0.get() as u64)
-        )
+        Duration::from_nanos((CNTPCT_EL0.get() as u64) * 1_000_000_000 / (CNTFRQ_EL0.get() as u64))
     }
 
     fn wait_for(&self, duration: Duration) {

@@ -117,14 +117,12 @@ register_structs! {
     }
 }
 pub struct PL011 {
-    base: usize
+    base: usize,
 }
 
 impl PL011 {
     pub const fn new() -> Self {
-        Self {
-            base: 0x2000_0000
-        }
+        Self { base: 0x2000_0000 }
     }
 }
 
@@ -142,12 +140,16 @@ impl Uart for PL011 {
         self.base = bsp::mmio_base();
         let gpio_regs = (self.base + 0x20_0000) as *const gpio;
         // map pins 14 and 15 to PL011 TX and RX respectively
-        (*gpio_regs).GPFSEL1.modify(GPFSEL1::FSEL15::AltFunc0 + GPFSEL1::FSEL14::AltFunc0);
+        (*gpio_regs)
+            .GPFSEL1
+            .modify(GPFSEL1::FSEL15::AltFunc0 + GPFSEL1::FSEL14::AltFunc0);
         // enable pins 14 and 15 by disabling pull up/down
         (*gpio_regs).GPPUD.write(GPPUD::PUD::Off);
         cpu::spin_for_cycles(150);
         // Assert Clock for both
-        (*gpio_regs).GPPUDCLK0.write(GPPUDCLK0::PUDCLK15::AssertClock + GPPUDCLK0::PUDCLK14::AssertClock);
+        (*gpio_regs)
+            .GPPUDCLK0
+            .write(GPPUDCLK0::PUDCLK15::AssertClock + GPPUDCLK0::PUDCLK14::AssertClock);
         cpu::spin_for_cycles(150);
         // Flush GPIO setup
         (*gpio_regs).GPPUDCLK0.set(0);
@@ -164,9 +166,13 @@ impl Uart for PL011 {
         // because 0.02083*64 = 1.3312, rounded to 1
         (*uart_regs).FBRD.write(FBRD::FBRD.val(1));
         // set LCRH to 8 bit chars and enable FIFO
-        (*uart_regs).LCRH.write(LCRH::WLEN::EightBits + LCRH::FEN::FifoEnabled);
+        (*uart_regs)
+            .LCRH
+            .write(LCRH::WLEN::EightBits + LCRH::FEN::FifoEnabled);
         // set CR to enable UART, TX, and RX
-        (*uart_regs).CR.write(CR::UARTEN::SET + CR::TXE::SET + CR::RXE::SET);
+        (*uart_regs)
+            .CR
+            .write(CR::UARTEN::SET + CR::TXE::SET + CR::RXE::SET);
     }
     fn get(&mut self) -> Option<u8> {
         let uart_regs = (self.base + 0x20_1000) as *const uart;
@@ -174,7 +180,7 @@ impl Uart for PL011 {
         unsafe {
             match (*uart_regs).FR.matches_all(FR::RXFE::SET) {
                 true => None,
-                false => Some((*uart_regs).DR.get() as u8)
+                false => Some((*uart_regs).DR.get() as u8),
             }
         }
     }

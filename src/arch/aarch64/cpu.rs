@@ -1,6 +1,6 @@
 global_asm!(include_str!("header.S"));
+use crate::{link_var, memory};
 use cortex_a::{asm, regs::*};
-use crate::{memory, link_var};
 
 link_var!(__start);
 #[inline(always)]
@@ -41,7 +41,7 @@ pub unsafe fn __early_entry(_dtb_addr: *mut u8) -> ! {
         0b11_00 => el3_to_el2(),
         0b10_00 => el2_to_el1(),
         0b01_00 => memory::setup_environment(_dtb_addr),
-        _ => wait_forever()
+        _ => wait_forever(),
     }
 }
 
@@ -57,7 +57,13 @@ unsafe fn el2_to_el1() -> ! {
     HCR_EL2.write(HCR_EL2::RW::EL1IsAarch64);
 
     // Set the Debug exception mask, SError interrupt mask, IRQ interrupt mask, FIQ interrupt mask, and EL1h for selected stack pointer
-    SPSR_EL2.write(SPSR_EL2::D::Masked + SPSR_EL2::A::Masked + SPSR_EL2::I::Masked + SPSR_EL2::F::Masked + SPSR_EL2::M::EL1h);
+    SPSR_EL2.write(
+        SPSR_EL2::D::Masked
+            + SPSR_EL2::A::Masked
+            + SPSR_EL2::I::Masked
+            + SPSR_EL2::F::Masked
+            + SPSR_EL2::M::EL1h,
+    );
 
     // Set the link register to the correct location (this will execute after exception return)
     ELR_EL2.set(memory::setup_environment as *const () as u64);

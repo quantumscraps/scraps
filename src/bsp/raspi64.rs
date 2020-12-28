@@ -1,6 +1,6 @@
 use crate::drivers::pl011::PL011;
-use spin::Mutex;
 use cortex_a::regs::*;
+use spin::Mutex;
 
 //pub static UART: Mutex<PL011> = Mutex::new(PL011::new());
 pub static mut UNSAFE_UART: PL011 = PL011::new();

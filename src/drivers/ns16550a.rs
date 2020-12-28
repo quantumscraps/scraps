@@ -98,7 +98,7 @@ impl Uart for NS16550A {
             // check if data is ready
             match (*regs).LSR.matches_all(LSR::DR::SET) {
                 true => Some((*regs).RBR.get()),
-                false => None
+                false => None,
             }
         }
     }
