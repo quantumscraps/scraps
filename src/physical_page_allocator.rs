@@ -1,7 +1,6 @@
 pub use crate::bsp::{HEAP_SIZE, PAGE_SIZE};
 use crate::{link_var, print, println};
 use core::alloc::GlobalAlloc;
-use spin::Mutex;
 
 link_var!(__heap_start);
 
@@ -164,7 +163,8 @@ where
 {
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
         //printk!("allocating size = {}", layout.size());
-        ALLOCATOR.try_allocate(layout.size())
+        ALLOCATOR
+            .try_allocate(layout.size())
             .expect("Failed to make allocation for global allocator") as _
     }
 

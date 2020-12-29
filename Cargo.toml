@@ -13,6 +13,7 @@ fdt-rs = { version = "0.4", default-features = false }
 spin = "0.7"
 register = "1.0"
 cortex-a = { version = "5.1", optional = true }
+modular-bitfield = "0.11.2"
 
 [features]
 bsp_raspi64 = ["cortex-a"]
