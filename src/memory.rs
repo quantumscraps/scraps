@@ -2,20 +2,23 @@ use crate::link_var;
 link_var!(__bss_start);
 link_var!(__bss_size);
 
-const fn usize_subdivide(size: usize) -> usize {
+const fn subdivide_size<T: Sized>(size: usize) -> usize {
+    let t_size = core::mem::size_of::<T>();
     assert!(
-        size % core::mem::size_of::<usize>() == 0,
-        "bss size must be a multiple of sizeof(usize)"
+        size % t_size == 0,
+        "bss size must be a multiple of given type"
     );
-    size / core::mem::size_of::<usize>()
+    size / t_size
 }
 
+/// # Safety
+/// Safe only to be called from asm entry.
 #[no_mangle]
 pub unsafe fn setup_environment(dtb_addr: *mut u8) -> ! {
     // get bss section as slice
     let slice = core::slice::from_raw_parts_mut(
         &__bss_start as *const _ as *mut usize,
-        usize_subdivide(&__bss_size as *const _ as usize),
+        subdivide_size::<usize>(&__bss_size as *const _ as usize),
     );
 
     // zero the slice

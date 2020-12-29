@@ -177,6 +177,7 @@ impl Uart for PL011 {
     fn get(&mut self) -> Option<u8> {
         let uart_regs = (self.base + 0x20_1000) as *const uart;
         // match on emptiness of RX fifo
+        // safety: accessing register properly
         unsafe {
             match (*uart_regs).FR.matches_all(FR::RXFE::SET) {
                 true => None,
@@ -186,6 +187,7 @@ impl Uart for PL011 {
     }
     fn put(&mut self, value: u8) {
         let uart_regs = (self.base + 0x20_1000) as *const uart;
+        // safety: accessing register properly
         unsafe {
             while (*uart_regs).FR.matches_all(FR::TXFF::SET) {
                 cpu::nop();

@@ -60,6 +60,8 @@ impl NS16550A {
         Self { base_address }
     }
 
+    /// # Safety
+    /// This UART's base address must be pointing to a valid MMIO address.
     unsafe fn regs(&mut self) -> &UARTBlock {
         &*(self.base_address as *const UARTBlock)
     }
@@ -97,6 +99,7 @@ impl Uart for NS16550A {
     }
 
     fn get(&mut self) -> Option<u8> {
+        // safety: this function is only called if base address is valid.
         let regs = unsafe { self.regs() };
         // check if data is ready
         match regs.LSR.matches_all(LSR::DR::SET) {
@@ -106,6 +109,7 @@ impl Uart for NS16550A {
     }
 
     fn put(&mut self, value: u8) {
+        // safety: this function is only called if base address is valid.
         let regs = unsafe { self.regs() };
         // just set the value
         regs.RBR.set(value)

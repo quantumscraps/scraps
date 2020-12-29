@@ -2,6 +2,7 @@ global_asm!(include_str!("header.S"));
 
 #[inline(always)]
 pub fn wait_forever() -> ! {
+    // Safety: Never returns
     unsafe {
         loop {
             #[rustfmt::skip]

@@ -30,6 +30,11 @@ pub fn cluster_num() -> u8 {
 }
 #[inline(always)]
 #[no_mangle]
+/// # Safety
+/// Safe only to call from asm entry. Same safety restrictions as
+/// [setup_environment].
+///
+/// [setup_environment]: memory::setup_environment
 pub unsafe fn __early_entry(_dtb_addr: *mut u8) -> ! {
     if cluster_num() != 0 {
         wait_forever()
@@ -46,6 +51,8 @@ pub unsafe fn __early_entry(_dtb_addr: *mut u8) -> ! {
 }
 
 #[inline(always)]
+/// # Safety
+/// Only safe to call from [__early_entry].
 unsafe fn el2_to_el1() -> ! {
     // grant Counting and Timer for EL1
     CNTHCTL_EL2.write(CNTHCTL_EL2::EL1PCTEN::SET + CNTHCTL_EL2::EL1PCEN::SET);
@@ -76,6 +83,8 @@ unsafe fn el2_to_el1() -> ! {
 }
 
 #[inline(always)]
+/// # Safety
+/// Only safe to call from [__early_entry].
 unsafe fn el3_to_el2() -> ! {
     // This is RW bit + Hypervisor Call Enable + Non-secure bit. I'll open a PR in cortex-a to add HCE
     SCR_EL3.set(0x5b1);

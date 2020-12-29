@@ -33,6 +33,4 @@ register_bitfields! {
 }
 
 #[inline(never)]
-pub unsafe fn init() {
-    // 
-}
+pub const unsafe fn init() {}

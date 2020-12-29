@@ -9,6 +9,10 @@
 #![feature(naked_functions)]
 #![allow(incomplete_features)]
 #![deny(missing_docs)]
+#![deny(clippy::missing_errors_doc)]
+#![deny(clippy::missing_const_for_fn)]
+#![deny(clippy::missing_safety_doc)]
+#![warn(clippy::all)]
 #![no_main]
 #![no_std]
 
@@ -97,6 +101,11 @@ pub fn lookup_dtb_entry<'dt>(
 
 /// The early entry point for initializing the OS.
 /// Paging, DTB, etc. are setup here.
+///
+/// # Safety
+/// Safe only to call from [setup_environment].
+///
+/// [setup_environment]: memory::setup_environment
 #[no_mangle]
 pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     //mmu::init();

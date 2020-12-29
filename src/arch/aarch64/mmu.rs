@@ -136,6 +136,8 @@ pub fn map_one_page(root: &mut Table, virt_addr: usize, phys_addr: usize, level:
     *v = TableDescriptor::new(phys_addr);
 }
 #[inline(never)]
+/// # Safety
+/// Only safe to call once.
 pub unsafe fn init() {
     /* * * * * * * * * * * * * * * * * * * * * * * * * * * *
      * 1) Initialize TCR_EL1 (done)                        *

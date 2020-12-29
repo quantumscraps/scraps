@@ -55,17 +55,24 @@ where
     }
 
     /// Initializes based on _heap_start global constant.
+    ///
+    /// # Safety
+    /// Only safe to call from a single allocator, otherwise multiple allocators
+    /// will have the same base address.
     pub unsafe fn default_init(&mut self) {
         let val = &__heap_start as *const _ as usize;
         self.init(val);
     }
 
     /// Initializes with the given start value.
+    ///
+    /// # Safety
+    /// Inherently unsafe to call since the start value cannot be validated.
     pub unsafe fn init(&mut self, start: usize) {
         self.start = start;
     }
 
-    pub fn get_base(&self) -> usize {
+    pub const fn get_base(&self) -> usize {
         self.start
     }
 
@@ -125,7 +132,7 @@ where
                     print!("X");
                 }
             }
-            println!("");
+            println!();
         }
         println!();
         println!(". = free, X = taken");
