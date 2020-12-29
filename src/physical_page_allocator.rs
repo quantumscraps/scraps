@@ -38,15 +38,10 @@ where
     descriptors: [u8; pages_subdivide(PAGES)],
 }
 
-pub struct MutexWrapper<const PAGES: usize>(Mutex<PhysicalPageAllocator<PAGES>>)
-where
-    [u8; pages_subdivide(PAGES)]: Sized;
-
 // TODO: write an actual allocator that's efficient
 // this literally allocates a whole page for like 7 bytes
 #[global_allocator]
-pub static ALLOCATOR: MutexWrapper<HEAP_SIZE> =
-    MutexWrapper(Mutex::new(PhysicalPageAllocator::new()));
+pub static mut ALLOCATOR: PhysicalPageAllocator<HEAP_SIZE> = PhysicalPageAllocator::new();
 
 impl<const PAGES: usize> PhysicalPageAllocator<PAGES>
 where
@@ -130,7 +125,7 @@ where
                     print!("X");
                 }
             }
-            print!("\n");
+            println!("");
         }
         println!();
         println!(". = free, X = taken");
@@ -156,30 +151,18 @@ const fn size_to_pages(size: usize) -> usize {
     }
 }
 
-impl<const PAGES: usize> core::ops::Deref for MutexWrapper<PAGES>
-where
-    [u8; pages_subdivide(PAGES)]: Sized,
-{
-    type Target = Mutex<PhysicalPageAllocator<PAGES>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-unsafe impl<const PAGES: usize> GlobalAlloc for MutexWrapper<PAGES>
+unsafe impl<const PAGES: usize> GlobalAlloc for PhysicalPageAllocator<PAGES>
 where
     [u8; pages_subdivide(PAGES)]: Sized,
 {
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
         //printk!("allocating size = {}", layout.size());
-        self.lock()
-            .try_allocate(layout.size())
+        ALLOCATOR.try_allocate(layout.size())
             .expect("Failed to make allocation for global allocator") as _
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
         //printk!("addr = {:?} size = {}", ptr, layout.size());
-        self.lock().deallocate(ptr as _, layout.size());
+        ALLOCATOR.deallocate(ptr as _, layout.size());
     }
 }

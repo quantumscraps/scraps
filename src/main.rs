@@ -98,12 +98,13 @@ pub fn lookup_dtb_entry<'dt>(
 /// Paging, DTB, etc. are setup here.
 #[no_mangle]
 pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
-    mmu::init();
+    //mmu::init();
     bsp::UNSAFE_UART.init();
     let v = 12;
     printk!("dtb_addr = {:?}", dtb_addr);
     // init allocator
-    ALLOCATOR.lock().default_init();
+    ALLOCATOR.default_init();
+    mmu::init();
     let r = DevTree::read_totalsize(core::slice::from_raw_parts(
         dtb_addr as *const _,
         DevTree::MIN_HEADER_SIZE,
@@ -139,19 +140,19 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
         "Timer Accuracy: {} ns",
         time::time_counter().accuracy().as_nanos()
     );
-    printk!("PPE = {:?}", ALLOCATOR.lock().get_base() as *const i8);
+    printk!("PPE = {:?}", ALLOCATOR.get_base() as *const i8);
     printk!("Allocating 35 pages...");
-    let allocation = ALLOCATOR.lock().try_allocate(35 * PAGE_SIZE);
+    let allocation = ALLOCATOR.try_allocate(35 * PAGE_SIZE);
     if let Some(allocation) = allocation {
         printk!("Success! Allocation address = {:?}", allocation);
     } else {
         printk!("Failure...");
     }
-    ALLOCATOR.lock().print_page_allocation_table();
+    ALLOCATOR.print_page_allocation_table();
     if let Some(allocation) = allocation {
         printk!("Freeing allocation...");
-        ALLOCATOR.lock().deallocate(allocation, 35 * PAGE_SIZE);
-        ALLOCATOR.lock().print_page_allocation_table();
+        ALLOCATOR.deallocate(allocation, 35 * PAGE_SIZE);
+        ALLOCATOR.print_page_allocation_table();
     }
     // Allocate and reserve a vec
     printk!("Allocating a vec<string> and reserving 37 items, then pushing a bunch of strings...");
@@ -159,10 +160,10 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     for _ in 0..37 {
         v.push(String::from("testabc"));
     }
-    ALLOCATOR.lock().print_page_allocation_table();
+    ALLOCATOR.print_page_allocation_table();
     printk!("Dropping vec..");
     drop(v);
-    ALLOCATOR.lock().print_page_allocation_table();
+    ALLOCATOR.print_page_allocation_table();
     //printk!("Heap size = {}", _heap_size);
     loop {
         printk!("Hello, World!");
