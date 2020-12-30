@@ -1,5 +1,6 @@
 use core::convert;
 use cortex_a::{barrier, regs::*};
+use crate::{print, println};
 use register::{register_bitfields, InMemoryRegister};
 use crate::physical_page_allocator::{ALLOCATOR, PAGE_SIZE};
 
@@ -62,13 +63,14 @@ register_bitfields! {
 pub struct TableDescriptor(u64);
 
 #[repr(C)]
+#[repr(align(65536))]
 pub struct Table {
-    pub entries: [TableDescriptor; 512]
+    pub entries: [TableDescriptor; 8192]
 }
 impl TableDescriptor {
     pub fn is_valid(&self) -> bool {
         let temp: InMemoryRegister<u64, TABLE_DESC::Register> = InMemoryRegister::new(self.0);
-        
+        println!("is_valid: {}", temp.is_set(TABLE_DESC::VALID));
         temp.is_set(TABLE_DESC::VALID)
     }
 }
@@ -97,7 +99,7 @@ impl TableDescriptor {
         temp.write(
             TABLE_DESC::ADDR.val(addr as u64 >> 16)
                 + TABLE_DESC::AF::True
-                + TABLE_DESC::TYPE::Table
+                + TABLE_DESC::TYPE::Table // Make this changeable later
                 + TABLE_DESC::VALID::True
                 + TABLE_DESC::SH::OuterShareable
                 + TABLE_DESC::MemAttr.val(1),
@@ -109,18 +111,21 @@ impl TableDescriptor {
         temp.read(TABLE_DESC::ADDR) as usize
     }
 }
+
+// This one is for 64K page size 2 level 42 bit vaddr
 pub fn map_one_page(root: &mut Table, virt_addr: usize, phys_addr: usize, level: usize) {
     // Split virtual address into components
     let virt_indexes = [
-        (virt_addr >> 30) & 0x1ff,
-        (virt_addr >> 21) & 0x1ff,
-        (virt_addr >> 12) & 0x1ff
+        (virt_addr >> 29) & 0x1fff, // level 2 (512M)
+        (virt_addr >> 16) & 0x1fff  // level 3 (64K)
     ];
+    println!("virt_indexes({:#x}): {:#x} {:#x}", virt_addr, virt_indexes[0], virt_indexes[1]);
     // First component
     let mut v = &mut root.entries[virt_indexes[0]];
     // Iterate over levels till we get to the right level
     // v will store the correct PTE location at the end
-    for i in level..2 {
+    // level = 0 -> 64K page, level = 1 -> 512M block
+    for i in level..1 {
         // if the index in the entry is not valid
         if !v.is_valid() {
             // get us a page and mark it as valid in the table for the next level
@@ -131,6 +136,11 @@ pub fn map_one_page(root: &mut Table, virt_addr: usize, phys_addr: usize, level:
         // and advance v past it
         let entry: *mut TableDescriptor = v;
         v = unsafe {entry.add(virt_indexes[i]).as_mut().unwrap() };
+    }
+    if !v.is_valid() {
+        // get us a page and mark it as valid in the table for the next level
+        let page = unsafe { ALLOCATOR.try_allocate(PAGE_SIZE).expect("Couldn't allocate page") };
+        *v = unsafe { (page as usize).into() };
     }
     // Now that v contains the right PTE pointer, store the right PTE!!!!
     *v = TableDescriptor::new(phys_addr);
@@ -146,46 +156,49 @@ pub unsafe fn init() {
      * 4) Enable MMU (easy)                                *
      * * * * * * * * * * * * * * * * * * * * * * * * * * * */
     TCR_EL1.write(
-        TCR_EL1::TG1::KiB_4        // 4 KiB granule for higher half
-        + TCR_EL1::TG0::KiB_4      // 4 KiB granule for lower half
+        TCR_EL1::TG0::KiB_64       // 64 KiB granule for higher half
+        //+ TCR_EL1::TG1::KiB_64     // 64 KiB granule for lower half
         + TCR_EL1::IPS.val(        // Maximum supported Physical Address range
             ID_AA64MMFR0_EL1.read(ID_AA64MMFR0_EL1::PARange)
         )
         + TCR_EL1::AS::ASID16Bits  // 16 bit address space ID
-        + TCR_EL1::T0SZ.val(64-39) // 39 bit VA in lower half
-        + TCR_EL1::T1SZ.val(64-39) // 39 bit VA in upper half
+        + TCR_EL1::T0SZ.val(64-42) // 39 bit VA in lower half
+        //+ TCR_EL1::T1SZ.val(64-42) // 39 bit VA in upper half
         + TCR_EL1::TBI0::Used      // Disable lower half VA tagging for now
-        + TCR_EL1::TBI1::Used      // Disable higher half VA tagging for now
+        //+ TCR_EL1::TBI1::Used      // Disable higher half VA tagging for now
         + TCR_EL1::IRGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable // Write back inner cacheable (lower)
         + TCR_EL1::ORGN0::WriteBack_ReadAlloc_WriteAlloc_Cacheable // Write back outer cacheable (lower)
-        + TCR_EL1::IRGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable // Write back inner cacheable (higher)
-        + TCR_EL1::ORGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable // Write back outer cacheable (higher)
+        //+ TCR_EL1::IRGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable // Write back inner cacheable (higher)
+        //+ TCR_EL1::ORGN1::WriteBack_ReadAlloc_WriteAlloc_Cacheable // Write back outer cacheable (higher)
         + TCR_EL1::EPD0::EnableTTBR0Walks // Self explanatory
-        + TCR_EL1::EPD1::EnableTTBR1Walks // Self explanatory
+        //+ TCR_EL1::EPD1::EnableTTBR1Walks // Self explanatory
         + TCR_EL1::SH0::Inner      // Inner shareability lower half
-        + TCR_EL1::SH1::Inner, // Inner shareability upper half
+        //+ TCR_EL1::SH1::Inner, // Inner shareability upper half
     );
-
     // Define 0 as normal cacheable DRAM and 1 as device/mmio
     MAIR_EL1.write(
         MAIR_EL1::Attr0_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc   // Outer DRAM Cacheability
         + MAIR_EL1::Attr0_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc // Ditto for inner
         + MAIR_EL1::Attr1_Device::nonGathering_nonReordering_EarlyWriteAck, // MMIO
     );
-    // call the map function somewhere here
+    // create the root PTE
     let mut root_table_u8 = unsafe { ALLOCATOR.try_allocate(PAGE_SIZE).expect("Couldn't allocate page") };
     let mut table = core::mem::transmute::<&mut u8, &mut Table>(&mut unsafe { *root_table_u8 });
-    // map 4 gigapages covering the address space
-    for i in 0..4 {
-        map_one_page(table, i * 1024 * 1024 * 1024, i * 1024 * 1024 * 1024, 2);
+    // identity map 8 pages starting from just before the kernel and mmio
+    for i in 0..8 {
+        map_one_page(table, 0x80000-PAGE_SIZE + i*PAGE_SIZE, 0x80000-PAGE_SIZE + i*PAGE_SIZE, 0);
     }
-    // Perform actual mapping
+    for i in 0..8 {
+        map_one_page(table, crate::bsp::mmio_base() + i*PAGE_SIZE, crate::bsp::mmio_base() + i*PAGE_SIZE, 0);
+    }
+    // Set up the TTBR0_EL1
+    TTBR0_EL1.set_baddr(root_table_u8 as *const _ as u64);
     // Enable MMU
     barrier::isb(barrier::SY);
     SCTLR_EL1.modify(
         SCTLR_EL1::M::Enable       // Enable the MMU
-        + SCTLR_EL1::C::Cacheable  // Enable data cache
-        + SCTLR_EL1::I::Cacheable, // Enable instruction cache
+        + SCTLR_EL1::C::NonCacheable  // Enable data cache
+        + SCTLR_EL1::I::NonCacheable, // Enable instruction cache
     );
     barrier::isb(barrier::SY);
 }

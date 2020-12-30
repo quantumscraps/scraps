@@ -108,7 +108,6 @@ pub fn lookup_dtb_entry<'dt>(
 /// [setup_environment]: memory::setup_environment
 #[no_mangle]
 pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
-    //mmu::init();
     bsp::UNSAFE_UART.init();
     let v = 12;
     printk!("dtb_addr = {:?}", dtb_addr);

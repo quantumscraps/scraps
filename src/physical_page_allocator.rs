@@ -78,7 +78,7 @@ where
     /// Try to allocate the contiguous region of pages, returning the pointer to the region if possible.
     pub fn try_allocate(&mut self, size: usize) -> Option<*mut u8> {
         let pages = size_to_pages(size);
-        //printk!("Trying to allocate {} pages", pages);
+        println!("Trying to allocate {} pages", pages);
         assert!(pages > 0, "Can't make an empty allocation");
         let mut begin_index = 0;
         let mut matching = 0;
@@ -114,6 +114,7 @@ where
             for descriptor in self.descriptors[begin_index..=begin_index + pages].iter_mut() {
                 *descriptor = (*descriptor) & !PageFlags::Free.val() | PageFlags::Taken.val();
             }
+            println!("baddr: {:x}", self.start + (begin_index * PAGE_SIZE));
             Some((self.start + (begin_index * PAGE_SIZE)) as _)
         } else {
             None
