@@ -183,14 +183,14 @@ def clean():
         print("nothing to do")
 def usage(exe: str):
     err(f"""
-Usage: {sys.argv[0]} build <board name>
-Or {sys.argv[0]} run <board name>
-Or {sys.argv[0]} binary <board name>
-Or {sys.argv[0]} objdump <board name>
-Or {sys.argv[0]} debug <board name> (starts gdbserver on localhost:1234)
-Or {sys.argv[0]} list-boards
-Or {sys.argv[0]} clean
-Or {sys.argv[0]} generate-vscode <board name>
+Usage: {exe} build <board name>
+Or {exe} run <board name>
+Or {exe} binary <board name>
+Or {exe} objdump <board name>
+Or {exe} debug <board name> (starts gdbserver on localhost:1234)
+Or {exe} list-boards
+Or {exe} clean
+Or {exe} generate-vscode <board name>
 
 Any additional arguments are passed to QEMU.
 """)
