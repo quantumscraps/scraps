@@ -33,14 +33,13 @@ mod print;
 mod time;
 //mod util;
 
-use crate::time::TimeCounter;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::time::Duration;
 use driver_interfaces::*;
 use fdt_rs::base::DevTree;
 use fdt_rs::index::{DevTreeIndex, DevTreeIndexItem};
 use fdt_rs::prelude::*;
+use mmu::{enable_paging, enable_smode, map_gigapage, Sv39PageTable};
 use physical_page_allocator::{ALLOCATOR, PAGE_SIZE};
 
 /// Creates a static ref to a linker variable
@@ -98,6 +97,9 @@ pub fn lookup_dtb_entry<'dt>(
         None
     }
 }
+
+/// Used to test if paging worked
+const PAGING_TEST: usize = 0x1010101010101010;
 
 /// The early entry point for initializing the OS.
 /// Paging, DTB, etc. are setup here.
@@ -174,9 +176,72 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     drop(v);
     ALLOCATOR.print_page_allocation_table();
     //printk!("Heap size = {}", _heap_size);
-    loop {
-        printk!("Hello, World!");
-        time::time_counter().wait_for(Duration::from_secs(1));
-    }
+    // loop {
+    //     printk!("Hello, World!");
+    //     time::time_counter().wait_for(Duration::from_secs(1));
+    // }
     //cpu::wait_forever()
+    printk!("Allocating root table...");
+    #[cfg(target_arch = "riscv64")]
+    {
+        printk!("Enabling S-mode...");
+        enable_smode(kinit2 as usize);
+    }
+    #[cfg(not(target_arch = "riscv64"))]
+    {
+        printk!("Unsupported for non-RISCV platforms, for now");
+    }
+    cpu::wait_forever()
+}
+
+unsafe fn kinit2() -> ! {
+    let root_table_addr = ALLOCATOR
+        .try_allocate(PAGE_SIZE)
+        .expect("Couldn't allocate page!");
+    printk!("Root table addr = {}", root_table_addr as usize);
+    printk!(
+        "root_addr % PAGE_SIZE = {}",
+        root_table_addr as usize % PAGE_SIZE
+    );
+    // Rust is smart :)
+    let root_table: &mut Sv39PageTable = &mut *(root_table_addr as *mut _);
+    root_table.init();
+
+    link_var!(__kern_start);
+    let kern_addr = &__kern_start as *const _ as u64;
+    let onegig = 0x40000000u64;
+    let kern_addr_rounded = kern_addr & !(onegig - 1);
+    printk!("Mapping UART addr = 0x{:x}", 0x1000_0000);
+    map_gigapage(root_table, 0x1000_0000, 0x1000_0000);
+    printk!("Mapping kern_addr (rounded) ~= 0x{:x}", kern_addr_rounded);
+    // 1) identity map
+    map_gigapage(root_table, kern_addr, kern_addr);
+    let hh_base = 0x2000000000u64;
+    printk!("Mapping hh_addr ~= 0x{:x}", hh_base);
+    // 2) let the higher half be something like 0x2000000000
+    map_gigapage(root_table, hh_base, kern_addr);
+    root_table.print();
+    // calculate addresses for identity and hh of PAGING_TEST
+    let paging_test_identity_addr = &PAGING_TEST as *const _ as u64;
+    // round kern_addr to 1g
+    let paging_test_hh_addr = paging_test_identity_addr - kern_addr_rounded + hh_base;
+    // enable paging and jump to higher half too
+    let kinit2_hh_addr = (kinit2 as u64) - kern_addr_rounded + hh_base;
+    enable_paging(root_table);
+    let satp_value: u64;
+    asm!("csrr {0}, satp", out(reg) satp_value);
+    printk!("Read SATP = {:064b}", satp_value);
+    //print!("yess");
+    printk!("It worked?");
+    // check values
+    printk!(
+        "PAGING_TEST from identity map: {:x}",
+        *(paging_test_identity_addr as *const usize)
+    );
+    printk!("*hh_base = {}", *(hh_base as *const usize));
+    printk!(
+        "PAGING_TEST from hh map:       {:x}",
+        *(paging_test_hh_addr as *const usize)
+    );
+    cpu::wait_forever()
 }

@@ -3,6 +3,7 @@ ENTRY(_start)
 SECTIONS
 {
     . = 0x80000000;
+    PROVIDE(__kern_start = .);
     .text : {
         PROVIDE(__text_start = .);
         *(.text.init) *(.text .text.*)
@@ -28,4 +29,5 @@ SECTIONS
     }
     PROVIDE(__stack = __bss_end + 0x80000);
     PROVIDE(__heap_start = __stack);
+    PROVIDE(__kern_end = __heap_start + 0x100000);
 }
