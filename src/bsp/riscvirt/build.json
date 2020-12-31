@@ -5,9 +5,7 @@
 	"features": [
 		"bsp_riscvirt"
 	],
-	"rustflags": [
-		"-C codegen-units=1"
-	],
+	"rustflags": [],
 	"runcmd": [
 		"qemu-system-riscv64",
 		"-M",
