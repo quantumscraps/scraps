@@ -1,5 +1,5 @@
 pub use crate::bsp::{HEAP_SIZE, PAGE_SIZE};
-use crate::{link_var, print, println};
+use crate::{link_var, print, printk, println};
 use core::alloc::GlobalAlloc;
 
 link_var!(__heap_start);
@@ -59,7 +59,21 @@ where
     /// Only safe to call from a single allocator, otherwise multiple allocators
     /// will have the same base address.
     pub unsafe fn default_init(&mut self) {
-        let val = &__heap_start as *const _ as usize;
+        // mask out bottom bits to align to page
+        let val = {
+            let heap_start = &__heap_start as *const _ as usize;
+            if heap_start % PAGE_SIZE == 0 {
+                heap_start
+            } else {
+                let new_val = (heap_start + PAGE_SIZE) & !(PAGE_SIZE - 1);
+                printk!(
+                    "Original heap_start is not page aligned, rounding 0x{:x} -> 0x{:x}",
+                    heap_start,
+                    new_val
+                );
+                new_val
+            }
+        };
         self.init(val);
     }
 
