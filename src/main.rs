@@ -39,7 +39,7 @@ use driver_interfaces::*;
 use fdt_rs::base::DevTree;
 use fdt_rs::index::{DevTreeIndex, DevTreeIndexItem};
 use fdt_rs::prelude::*;
-use mmu::{enable_paging, enable_smode, map_gigapage, Sv39PageTable};
+use mmu::{enable_paging, enable_smode, map_gigapage, table_lookup, Sv39PageTable};
 use physical_page_allocator::{ALLOCATOR, PAGE_SIZE};
 
 /// Creates a static ref to a linker variable
@@ -227,19 +227,27 @@ unsafe fn kinit2() -> ! {
     // round kern_addr to 1g
     let paging_test_hh_addr = paging_test_identity_addr - kern_addr_rounded + hh_base;
     // enable paging and jump to higher half too
-    let kinit2_hh_addr = (kinit2 as u64) - kern_addr_rounded + hh_base;
+    // let kinit2_hh_addr = (kinit2 as u64) - kern_addr_rounded + hh_base;
+    printk!(
+        "Looking up PAGING_TEST from hh map =       0x{:x}",
+        table_lookup(root_table, paging_test_hh_addr)
+    );
+    printk!(
+        "Looking up PAGING_TEST from identity map = 0x{:x}",
+        table_lookup(root_table, paging_test_identity_addr)
+    );
     enable_paging(root_table);
     let satp_value: u64;
     asm!("csrr {0}, satp", out(reg) satp_value);
-    printk!("Read SATP = {:064b}", satp_value);
+    printk!("Read SATP = 0b{:064b}", satp_value);
     //print!("yess");
     printk!("It worked?");
     // check values
+    printk!("*hh_base = {}", *(hh_base as *const usize));
     printk!(
         "PAGING_TEST from identity map: {:x}",
         *(paging_test_identity_addr as *const usize)
     );
-    printk!("*hh_base = {}", *(hh_base as *const usize));
     printk!(
         "PAGING_TEST from hh map:       {:x}",
         *(paging_test_hh_addr as *const usize)

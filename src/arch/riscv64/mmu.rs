@@ -53,9 +53,12 @@ impl Sv39PTE {
 
 /// Splits a physical address into (PPN[2], PPN[1], PPN[0])
 fn split_phys_addr(addr: u64) -> (u32, u16, u16) {
-    let ppn2 = (addr >> 12) & ((1 << 26) - 1);
-    let ppn1 = (addr >> 38) & ((1 << 9) - 1);
-    let ppn0 = (addr >> 47) & ((1 << 9) - 1);
+    let ppn0 = (addr >> 12) & ((1 << 10) - 1);
+    let ppn1 = (addr >> 21) & ((1 << 10) - 1);
+    let ppn2 = (addr >> 30) & ((1 << 27) - 1);
+    // let ppn2 = (addr >> 12) & ((1 << 26) - 1);
+    // let ppn1 = (addr >> 38) & ((1 << 9) - 1);
+    // let ppn0 = (addr >> 47) & ((1 << 9) - 1);
     // printk!(
     //     "Split {:056x} -> {:026x}, {:09x}, {:09x}",
     //     addr,
@@ -71,7 +74,7 @@ fn unsplit_phys_addr(parts: (u32, u16, u16)) -> u64 {
     let ppn2 = parts.0 as u64;
     let ppn1 = parts.1 as u64;
     let ppn0 = parts.2 as u64;
-    let res = (ppn2 << 12) | (ppn1 << 38) | (ppn0 << 47);
+    let res = (ppn0 << 12) | (ppn1 << 21) | (ppn2 << 30);
     // printk!(
     //     "Unsplit {:026x}, {:09x}, {:09x} -> {:056x}",
     //     ppn2,
@@ -113,7 +116,8 @@ pub type Sv39PageTable = PageTable<Sv39PTE>;
 
 impl Sv39PageTable {
     pub fn print(&self) {
-        for ent in self.entries.iter() {
+        for (i, ent) in self.entries.iter().enumerate() {
+            print!("{:04} ", i);
             if ent.valid() {
                 print!("V");
             } else {
@@ -145,15 +149,16 @@ impl Sv39PageTable {
     }
 }
 
+const ONEGIG: u64 = 0x40000000;
+
 /// maps a 1g gigapage by rounding the given addr
 pub fn map_gigapage(root: &mut Sv39PageTable, virt_addr: u64, phys_addr: u64) {
-    let onegig = 0x40000000u64;
     // let virt_addr = virt_addr & !(onegig - 1);
     // round the address down
-    let index = virt_addr / onegig;
+    let index = virt_addr / ONEGIG;
     printk!("Mapping root index {}", index);
     // mask out 1g of phys_addr
-    let phys_addr2 = phys_addr & !(onegig - 1);
+    let phys_addr2 = phys_addr & !(ONEGIG - 1);
     // set flags to vgrwx for now
     root.entries[index as usize] = Sv39PTE::from_addr(phys_addr2)
         .with_valid(true)
@@ -185,6 +190,30 @@ pub unsafe fn enable_smode(return_to: usize) {
     );
     printk!("mret...");
     asm!("mret", options(noreturn));
+}
+
+/// looks up a virtual address with the given root table
+/// and returns the physical address
+///
+/// only the bottom 39 bits of the virtual address are used
+/// and the physical address is masked to 56 bits
+///
+/// currently, only 1g gigagpages are supported
+pub fn table_lookup(table: &Sv39PageTable, virt_addr: u64) -> u64 {
+    let virt_addr = virt_addr & ((1 << 40) - 1);
+    let index = virt_addr / ONEGIG;
+    let entry = table.entries[index as usize];
+    if !entry.valid() {
+        panic!(
+            "Tried to lookup virtual address {:039x}, entry {} is not valid!",
+            virt_addr, index
+        );
+    } else {
+        // translate the offset from virt address to physical address
+        let phys_gaddr = entry.phys_addr();
+        let res = phys_gaddr + (virt_addr % ONEGIG);
+        res & ((1 << 57) - 1)
+    }
 }
 
 /// enables paging with the given root table
