@@ -15,7 +15,7 @@ SECTIONS
 	{
 		*(.rodata*)
 	}
-	. = ALIGN(0x10000);
+	. = ALIGN(4096);
 	__ro_end = .;
 	.data :
 	{
@@ -31,8 +31,8 @@ SECTIONS
 	}
 	__bss_size = __bss_end - __bss_start;
 	/* align to 8 because we clear out bss in u64 chunks */
-	. = ALIGN(0x10000);
 	__end = .;
+	. = ALIGN(4096);
 	__heap_start = .;
 	/DISCARD/ : { *(.comment*) *(.gnu) *(.note) *(.eh_frame*)}
 }

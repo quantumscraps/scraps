@@ -15,5 +15,5 @@ pub fn mmio_base() -> usize {
     }
 }
 
-pub const HEAP_SIZE: usize = 0x1000000; // PAGE_SIZE * 1048576; // 1m allocations
-pub const PAGE_SIZE: usize = 0x10000;
+pub const HEAP_SIZE: usize = 0x100000; // PAGE_SIZE * 1048576; // 1m allocations
+pub const PAGE_SIZE: usize = 0x1000;
