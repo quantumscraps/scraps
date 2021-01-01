@@ -2,7 +2,10 @@
 
 use modular_bitfield::prelude::*;
 
-use crate::{physical_page_allocator::PAGE_SIZE, print, printk};
+use crate::{
+    physical_page_allocator::{ALLOCATOR, PAGE_SIZE},
+    print, printk,
+};
 
 #[bitfield]
 #[repr(u64)]
@@ -49,6 +52,14 @@ impl Sv39PTE {
     fn phys_addr(&self) -> u64 {
         unsplit_phys_addr((self.ppn2(), self.ppn1(), self.ppn0()))
     }
+}
+
+/// Splits a Sv39 virtual address into (VPN[2], VPN[1], VPN[0])
+fn split_virt_addr_sv39(addr: u64) -> (u16, u16, u16) {
+    let vpn0 = (addr >> 12) & ((1 << 9) - 1);
+    let vpn1 = (addr >> 21) & ((1 << 9) - 1);
+    let vpn2 = (addr >> 30) & ((1 << 9) - 1);
+    (vpn2 as u16, vpn1 as u16, vpn0 as u16)
 }
 
 /// Splits a physical address into (PPN[2], PPN[1], PPN[0])
@@ -116,7 +127,14 @@ pub type Sv39PageTable = PageTable<Sv39PTE>;
 
 impl Sv39PageTable {
     pub fn print(&self) {
+        self.print_indented(0);
+    }
+
+    fn print_indented(&self, indent: usize) {
         for (i, ent) in self.entries.iter().enumerate() {
+            for _ in 0..indent {
+                print!(" ");
+            }
             print!("{:04} ", i);
             if ent.valid() {
                 print!("V");
@@ -129,27 +147,36 @@ impl Sv39PageTable {
                 print!(" ");
             }
             let perms = ent.permissions();
-            if (perms as usize) & (XWRPermissions::ReadOnly as usize) > 0 {
-                print!("R");
+            if ent.valid() && perms == XWRPermissions::Pointer {
+                print!("***");
             } else {
-                print!(" ");
+                if (perms as usize) & (XWRPermissions::ReadOnly as usize) > 0 {
+                    print!("R");
+                } else {
+                    print!(" ");
+                }
+                if (perms as usize) & (XWRPermissions::WriteOnly as usize) > 0 {
+                    print!("W");
+                } else {
+                    print!(" ");
+                }
+                if (perms as usize) & (XWRPermissions::ExecOnly as usize) > 0 {
+                    print!("X");
+                } else {
+                    print!(" ");
+                }
             }
-            if (perms as usize) & (XWRPermissions::WriteOnly as usize) > 0 {
-                print!("W");
-            } else {
-                print!(" ");
+            print!(" -> 0x{:x}\n", ent.phys_addr());
+            // If this PTE is a indirection, print out the next level
+            if ent.valid() && perms == XWRPermissions::Pointer {
+                let next_level_table = unsafe { &*(ent.phys_addr() as *const Sv39PageTable) };
+                next_level_table.print_indented(indent + 1);
             }
-            if (perms as usize) & (XWRPermissions::ExecOnly as usize) > 0 {
-                print!("X");
-            } else {
-                print!(" ");
-            }
-            print!(" -> 0x{:x}\n", ent.phys_addr() << 12);
         }
     }
 }
 
-const ONEGIG: u64 = 0x40000000;
+pub const ONEGIG: u64 = 0x40000000;
 
 /// maps a 1g gigapage by rounding the given addr
 pub fn map_gigapage(root: &mut Sv39PageTable, virt_addr: u64, phys_addr: u64) {
@@ -161,6 +188,67 @@ pub fn map_gigapage(root: &mut Sv39PageTable, virt_addr: u64, phys_addr: u64) {
     let phys_addr2 = phys_addr & !(ONEGIG - 1);
     // set flags to vgrwx for now
     root.entries[index as usize] = Sv39PTE::from_addr(phys_addr2)
+        .with_valid(true)
+        .with_global(true)
+        .with_permissions(XWRPermissions::ReadWriteExec);
+}
+
+/// maps a 4k page by rounding the given addr
+pub fn map_page(root: &mut Sv39PageTable, virt_addr: u64, phys_addr: u64) {
+    // mask out page_size of phys_addr
+    let phys_addr2 = phys_addr & !(PAGE_SIZE as u64 - 1);
+    // split virt addr
+    let (vpn2, vpn1, vpn0) = split_virt_addr_sv39(virt_addr);
+    printk!(
+        "root index = {}, level1 index = {}, level2 index = {}",
+        vpn2,
+        vpn1,
+        vpn0
+    );
+    let root_entry = &mut root.entries[vpn2 as usize];
+    // if invalid, allocate page
+    // otherwise, use new pointer
+    let level1_table = if root_entry.valid() {
+        unsafe { &mut *(root_entry.phys_addr() as *mut Sv39PageTable) }
+    } else {
+        // allocate page
+        let new_addr = unsafe { &mut ALLOCATOR }
+            .try_allocate(PAGE_SIZE)
+            .expect("Failed to allocate page!") as u64;
+        // set entry
+        *root_entry = Sv39PTE::from_addr(new_addr)
+            .with_valid(true)
+            .with_permissions(XWRPermissions::Pointer);
+        let table = unsafe { &mut *(new_addr as *mut Sv39PageTable) };
+        // initialize table
+        table.init();
+        table
+    };
+    // same thing for level2
+    let level1_entry = &mut level1_table.entries[vpn1 as usize];
+    let level2_table = if level1_entry.valid() {
+        unsafe { &mut *(root_entry.phys_addr() as *mut Sv39PageTable) }
+    } else {
+        // allocate page
+        let new_addr = unsafe { &mut ALLOCATOR }
+            .try_allocate(PAGE_SIZE)
+            .expect("Failed to allocate page!") as u64;
+        // set entry
+        *level1_entry = Sv39PTE::from_addr(new_addr)
+            .with_valid(true)
+            .with_permissions(XWRPermissions::Pointer);
+        let table = unsafe { &mut *(new_addr as *mut Sv39PageTable) };
+        // initialize table
+        table.init();
+        table
+    };
+    let level2_entry = &mut level2_table.entries[vpn0 as usize];
+    // check that the entry is not valid already
+    if level2_entry.valid() {
+        panic!("Trying to overwrite a valid PTE entry");
+    }
+    // set leaf
+    *level2_entry = Sv39PTE::from_addr(phys_addr2)
         .with_valid(true)
         .with_global(true)
         .with_permissions(XWRPermissions::ReadWriteExec);
@@ -279,7 +367,7 @@ pub fn enable_paging(table: &Sv39PageTable) {
 //     asm!("ret", options(noreturn));
 // }
 
-#[derive(BitfieldSpecifier, Clone, Copy)]
+#[derive(BitfieldSpecifier, Clone, Copy, PartialEq, Eq)]
 #[bits = 3]
 enum XWRPermissions {
     Pointer = 0b000,
