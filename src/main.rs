@@ -39,7 +39,7 @@ use driver_interfaces::*;
 use fdt_rs::base::DevTree;
 use fdt_rs::index::{DevTreeIndex, DevTreeIndexItem};
 use fdt_rs::prelude::*;
-use mmu::{enable_paging, enable_smode, map_gigapage, table_lookup, Sv39PageTable};
+use mmu::{enable_paging, enable_smode, map_gigapage, map_page, table_lookup, Sv39PageTable};
 use physical_page_allocator::{ALLOCATOR, PAGE_SIZE};
 
 /// Creates a static ref to a linker variable
@@ -208,14 +208,33 @@ unsafe fn kinit2() -> ! {
     root_table.init();
 
     link_var!(__kern_start);
+    link_var!(__kern_end);
+    let page_size_u64 = PAGE_SIZE as u64;
     let kern_addr = &__kern_start as *const _ as u64;
-    let onegig = 0x40000000u64;
-    let kern_addr_rounded = kern_addr & !(onegig - 1);
+    let kern_end_addr = &__kern_end as *const _ as u64;
+    assert!(kern_end_addr > kern_addr);
+    // let onegig = 0x40000000u64;
+    let kern_addr_rounded = kern_addr & !(page_size_u64 - 1);
+    let kern_end_rounded = if kern_end_addr % page_size_u64 != 0 {
+        ((kern_end_addr / page_size_u64) + 1) * page_size_u64
+    } else {
+        kern_end_addr
+    };
     printk!("Mapping UART addr = 0x{:x}", 0x1000_0000);
-    map_gigapage(root_table, 0x1000_0000, 0x1000_0000);
+    map_page(root_table, 0x1000_0000, 0x1000_0000);
     printk!("Mapping kern_addr (rounded) ~= 0x{:x}", kern_addr_rounded);
+    let offset = kern_addr_rounded as usize / PAGE_SIZE;
+    let sub = (kern_end_rounded - kern_addr_rounded) as usize;
+    printk!("sub = {}", sub);
+    let len = sub / PAGE_SIZE;
+    printk!("Mapping {} pages", len);
+    for i in offset..(offset + len) {
+        let addr = (i * PAGE_SIZE) as u64;
+        printk!("Identity mapping 0x{:x}", addr);
+        map_page(root_table, addr, addr);
+    }
     // 1) identity map
-    map_gigapage(root_table, kern_addr, kern_addr);
+    // map_gigapage(root_table, kern_addr, kern_addr);
     let hh_base = 0x2000000000u64;
     printk!("Mapping hh_addr ~= 0x{:x}", hh_base);
     // 2) let the higher half be something like 0x2000000000
