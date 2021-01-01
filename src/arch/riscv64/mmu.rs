@@ -309,26 +309,44 @@ pub unsafe fn enable_smode(return_to: usize) {
 
 /// looks up a virtual address with the given root table
 /// and returns the physical address
-///
-/// only the bottom 39 bits of the virtual address are used
-/// and the physical address is masked to 56 bits
-///
-/// currently, only 1g gigagpages are supported
 pub fn table_lookup(table: &Sv39PageTable, virt_addr: u64) -> u64 {
-    let virt_addr = virt_addr & ((1 << 40) - 1);
-    let index = virt_addr / ONEGIG;
-    let entry = table.entries[index as usize];
-    if !entry.valid() {
+    // let virt_addr = virt_addr & ((1 << 39) - 1);
+    // let index = virt_addr / ONEGIG;
+    let (vpn2, vpn1, vpn0) = split_virt_addr_sv39(virt_addr);
+    let root_entry = table.entries[vpn2 as usize];
+    if !root_entry.valid() {
         panic!(
-            "Tried to lookup virtual address {:039x}, entry {} is not valid!",
-            virt_addr, index
+            "Tried to lookup virtual address {:039x}, root entry {} is not valid!",
+            virt_addr, vpn2
         );
-    } else {
-        // translate the offset from virt address to physical address
-        let phys_gaddr = entry.phys_addr();
-        let res = phys_gaddr + (virt_addr % ONEGIG);
-        res & ((1 << 57) - 1)
     }
+    if root_entry.permissions() != XWRPermissions::Pointer {
+        // resolve here
+        let phys_gaddr = root_entry.phys_addr();
+        return phys_gaddr + ((vpn1 as u64) << 21) + ((vpn0 as u64) << 12) + (virt_addr % (1 << 9));
+    }
+    let level1_table = unsafe { &*(root_entry.phys_addr() as *const Sv39PageTable) };
+    let level1_entry = level1_table.entries[vpn1 as usize];
+    if !level1_entry.valid() {
+        panic!(
+            "Tried to lookup virtual address {:039x}, level 1 entry {} is not valid!",
+            virt_addr, vpn1
+        );
+    }
+    if level1_entry.permissions() != XWRPermissions::Pointer {
+        let phys_gaddr = level1_entry.phys_addr();
+        return phys_gaddr + ((vpn0 as u64) << 12) + (virt_addr % (1 << 9));
+    }
+    let level2_table = unsafe { &*(level1_entry.phys_addr() as *const Sv39PageTable) };
+    let level2_entry = level2_table.entries[vpn0 as usize];
+    if !level2_entry.valid() || level2_entry.permissions() == XWRPermissions::Pointer {
+        panic!(
+            "Tried to lookup virtual address {:039x}, level 2 entry {} is not valid!",
+            virt_addr, vpn0
+        );
+    }
+    let phys_gaddr = level2_entry.phys_addr();
+    phys_gaddr + (virt_addr % (1 << 9))
 }
 
 /// enables paging with the given root table
