@@ -64,9 +64,9 @@ fn split_virt_addr_sv39(addr: u64) -> (u16, u16, u16) {
 
 /// Splits a physical address into (PPN[2], PPN[1], PPN[0])
 fn split_phys_addr(addr: u64) -> (u32, u16, u16) {
-    let ppn0 = (addr >> 12) & ((1 << 10) - 1);
-    let ppn1 = (addr >> 21) & ((1 << 10) - 1);
-    let ppn2 = (addr >> 30) & ((1 << 27) - 1);
+    let ppn0 = (addr >> 12) & ((1 << 9) - 1);
+    let ppn1 = (addr >> 21) & ((1 << 9) - 1);
+    let ppn2 = (addr >> 30) & ((1 << 26) - 1);
     // let ppn2 = (addr >> 12) & ((1 << 26) - 1);
     // let ppn1 = (addr >> 38) & ((1 << 9) - 1);
     // let ppn0 = (addr >> 47) & ((1 << 9) - 1);
