@@ -227,7 +227,7 @@ pub fn map_page(root: &mut Sv39PageTable, virt_addr: u64, phys_addr: u64) {
     // same thing for level2
     let level1_entry = &mut level1_table.entries[vpn1 as usize];
     let level2_table = if level1_entry.valid() {
-        unsafe { &mut *(root_entry.phys_addr() as *mut Sv39PageTable) }
+        unsafe { &mut *(level1_entry.phys_addr() as *mut Sv39PageTable) }
     } else {
         // allocate page
         let new_addr = unsafe { &mut ALLOCATOR }
