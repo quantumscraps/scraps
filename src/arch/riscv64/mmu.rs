@@ -254,6 +254,33 @@ pub fn map_page(root: &mut Sv39PageTable, virt_addr: u64, phys_addr: u64) {
         .with_permissions(XWRPermissions::ReadWriteExec);
 }
 
+/// Maps a range of pages using [map_page]
+/// begin address is rounded down, end address is rounded up
+pub fn map_page_range(
+    root: &mut Sv39PageTable,
+    virt_addr_begin: u64,
+    virt_addr_end: u64,
+    phys_addr_begin: u64,
+) {
+    let page_size_u64 = PAGE_SIZE as u64;
+    let virt_offset = virt_addr_begin / page_size_u64;
+    let phys_offset = phys_addr_begin / page_size_u64;
+    let virt_addr_begin = virt_addr_begin & !(page_size_u64 - 1);
+    let virt_addr_end = if virt_addr_end % page_size_u64 > 0 {
+        ((virt_addr_end) & !(page_size_u64 - 1)) + page_size_u64
+    } else {
+        virt_addr_end
+    };
+    let len = (virt_addr_end - virt_addr_begin) / page_size_u64;
+    printk!("Mapping {} pages", len);
+    for i in 0..len {
+        let virt_addr = (i + virt_offset) * page_size_u64;
+        let phys_addr = (i + phys_offset) * page_size_u64;
+        printk!("Mapping {:x} -> {:x}", virt_addr, phys_addr);
+        map_page(root, virt_addr, phys_addr);
+    }
+}
+
 /// Enables S-mode
 ///
 /// # Safety
