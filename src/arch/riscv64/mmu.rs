@@ -112,17 +112,6 @@ where
     entries: [PTE; type_divide::<PTE>(PAGE_SIZE)],
 }
 
-impl<PTE: Sized + Default> PageTable<PTE>
-where
-    [PTE; type_divide::<PTE>(PAGE_SIZE)]: Sized,
-{
-    pub fn init(&mut self) {
-        for ent in self.entries.iter_mut() {
-            *ent = Default::default();
-        }
-    }
-}
-
 pub type Sv39PageTable = PageTable<Sv39PTE>;
 
 impl Sv39PageTable {
@@ -213,15 +202,13 @@ pub fn map_page(root: &mut Sv39PageTable, virt_addr: u64, phys_addr: u64) {
     } else {
         // allocate page
         let new_addr = unsafe { &mut ALLOCATOR }
-            .try_allocate(PAGE_SIZE)
+            .try_zallocate(PAGE_SIZE)
             .expect("Failed to allocate page!") as u64;
         // set entry
         *root_entry = Sv39PTE::from_addr(new_addr)
             .with_valid(true)
             .with_permissions(XWRPermissions::Pointer);
         let table = unsafe { &mut *(new_addr as *mut Sv39PageTable) };
-        // initialize table
-        table.init();
         table
     };
     // same thing for level2
@@ -231,15 +218,13 @@ pub fn map_page(root: &mut Sv39PageTable, virt_addr: u64, phys_addr: u64) {
     } else {
         // allocate page
         let new_addr = unsafe { &mut ALLOCATOR }
-            .try_allocate(PAGE_SIZE)
+            .try_zallocate(PAGE_SIZE)
             .expect("Failed to allocate page!") as u64;
         // set entry
         *level1_entry = Sv39PTE::from_addr(new_addr)
             .with_valid(true)
             .with_permissions(XWRPermissions::Pointer);
         let table = unsafe { &mut *(new_addr as *mut Sv39PageTable) };
-        // initialize table
-        table.init();
         table
     };
     let level2_entry = &mut level2_table.entries[vpn0 as usize];

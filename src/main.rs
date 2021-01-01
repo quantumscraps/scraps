@@ -196,7 +196,7 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
 /*
 unsafe fn kinit2() -> ! {
     let root_table_addr = ALLOCATOR
-        .try_allocate(PAGE_SIZE)
+        .try_zallocate(PAGE_SIZE)
         .expect("Couldn't allocate page!");
     printk!("Root table addr = {}", root_table_addr as usize);
     printk!(
@@ -205,7 +205,6 @@ unsafe fn kinit2() -> ! {
     );
     // Rust is smart :)
     let root_table: &mut Sv39PageTable = &mut *(root_table_addr as *mut _);
-    root_table.init();
 
     link_var!(__kern_start);
     link_var!(__kern_end);
