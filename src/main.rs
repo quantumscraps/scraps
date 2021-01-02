@@ -39,7 +39,10 @@ use driver_interfaces::*;
 use fdt_rs::base::DevTree;
 use fdt_rs::index::{DevTreeIndex, DevTreeIndexItem};
 use fdt_rs::prelude::*;
-//use mmu::{enable_paging, enable_smode, map_page, map_page_range, table_lookup, Sv39PageTable};
+use mmu::{
+    enable_paging, enable_smode, map_page, map_page_range, table_lookup, table_lookup2,
+    Sv39PageTable,
+};
 use physical_page_allocator::{ALLOCATOR, PAGE_SIZE};
 
 /// Creates a static ref to a linker variable
@@ -239,12 +242,16 @@ unsafe fn kinit2() -> ! {
     // enable paging and jump to higher half too
     // let kinit2_hh_addr = (kinit2 as u64) - kern_addr_rounded + hh_base;
     printk!(
-        "Looking up PAGING_TEST from hh map =       0x{:x}",
-        table_lookup(root_table, paging_test_hh_addr)
+        "Looking up PAGING_TEST from hh map =                    0x{:x}",
+        table_lookup2(root_table, paging_test_hh_addr)
     );
     printk!(
-        "Looking up PAGING_TEST from identity map = 0x{:x}",
-        table_lookup(root_table, paging_test_identity_addr)
+        "Looking up PAGING_TEST from hh map with new algorithm = 0x{:x}",
+        table_lookup(root_table, paging_test_hh_addr, 3)
+    );
+    printk!(
+        "Looking up PAGING_TEST from identity map =              0x{:x}",
+        table_lookup2(root_table, paging_test_identity_addr)
     );
     enable_paging(root_table);
     let satp_value: u64;

@@ -292,9 +292,108 @@ pub unsafe fn enable_smode(return_to: usize) {
     asm!("mret", options(noreturn));
 }
 
+/// Looks up a virtual address with the given root table
+/// and returns the physical address
+///
+/// using the given ptesize and levels
+///
+/// Directly translated from RISC-V Privileged Specification, Section 4.3.2
+pub fn table_lookup(mut table: &Sv39PageTable, virt_addr: u64, levels: usize) -> u64 {
+    let vpn = vpn_split_variable(virt_addr, levels);
+    // 1. a = table, i = levels - 1
+    let mut i = levels - 1;
+    while i > 0 {
+        // 2. pte = a+va.vpn[i]*PTESIZE
+        // PTESIZE is accounted for in entry indexing
+        let pte: Sv39PTE = table.entries[vpn[i] as usize];
+        // 3. If pte.v = 0 or (pte.r = 0 && pte.w = 1) raise fault
+        if !pte.valid() || (pte.permissions() as u8) ^ (XWRPermissions::ReadOnly as u8) == 0 {
+            panic!(
+                "Invalid PTE while trying to resolve virtual address {:x}",
+                virt_addr
+            );
+        }
+        // 4a. If pte.r = 1 || pte.x = 1, go to step 5
+        if (pte.permissions() as u8) ^ (XWRPermissions::WriteOnly as u8) != 0 {
+            // r/x
+            // 5. Assume that the access is allowed.
+            // 6. If i > 0 && pte.ppn[i - 1 : 0] != 0 raise fault
+            // let pte_ppn_lookup = ppn_build_lookup(pte, levels, if i > 0 { i - 1 } else { 0 }, 0);
+            // printk!("pte.ppn[i ( = {}) - 1 : 0] = {:x}", i, pte_ppn_lookup);
+            // if i > 0 && pte_ppn_lookup != 0 {
+            //     panic!(
+            //         "Misaligned superpage while trying to resolve virtual address {:x}",
+            //         virt_addr
+            //     );
+            // }
+            // 7. Skipped since no operation is being done.
+            // 8. Success, return the translated address.
+            let pa_pgoff = virt_addr & !(PAGE_SIZE as u64 - 1);
+            let mut ppn = alloc::vec![0u32; levels];
+            // superpage translation
+            if i > 0 {
+                // copy vpn indices
+                for j in (i - 1)..=0 {
+                    ppn[j] = vpn[j] as u32;
+                }
+            }
+            let pte_ppn = ppn_split_variable_sv39(pte);
+            // copy ppn
+            for j in (levels - 1)..=i {
+                ppn[j] = pte_ppn[j];
+            }
+            // Reassemble ppn into address
+            return reassemble_ppn(pa_pgoff as u16, ppn);
+        }
+        // 4b. i = i - 1, a = pte.ppn*PAGESIZE and go to step 2
+        i -= 1;
+        table = unsafe { &*(pte.phys_addr() as *const _) };
+    }
+    panic!("Shouldn't be here, page didn't resolve properly");
+}
+
+/// Helper used to implement RISC-V Privileged Specification, Section 4.3.2
+fn reassemble_ppn(pgoff: u16, ppns: alloc::vec::Vec<u32>) -> u64 {
+    let mut phys_addr = pgoff as u64;
+    let mut factor = PAGE_SIZE as u64;
+    for &ppn in ppns.iter() {
+        phys_addr |= (ppn as u64) * factor;
+        factor *= PAGE_SIZE as u64;
+    }
+    phys_addr
+}
+
+/// Helper used to implement RISC-V Privileged Specification, Section 4.3.2
+fn vpn_split_variable(virt_addr: u64, levels: usize) -> alloc::vec::Vec<u16> {
+    let mut virt_addr = virt_addr / PAGE_SIZE as u64;
+    let mut vpns = alloc::vec![];
+    for _ in 0..levels {
+        vpns.push((virt_addr & (PAGE_SIZE as u64 - 1)) as u16);
+        virt_addr /= PAGE_SIZE as u64;
+    }
+    vpns
+}
+
+/// Helper used to implement RISC-V Privileged Specification, Section 4.3.2
+fn ppn_split_variable_sv39(pte: Sv39PTE) -> alloc::vec::Vec<u32> {
+    alloc::vec![pte.ppn0() as u32, pte.ppn1() as u32, pte.ppn2()]
+}
+
+/// Helper used to implement RISC-V Privileged Specification, Section 4.3.2
+fn ppn_build_lookup(pte: Sv39PTE, levels: usize, end: usize, start: usize) -> u64 {
+    assert!(end <= levels, "Invalid bounds");
+    let ppn = ppn_split_variable_sv39(pte);
+    let mut phys_addr = 0u64;
+    for index in start..=end {
+        phys_addr |= ppn[index] as u64;
+        phys_addr *= PAGE_SIZE as u64;
+    }
+    phys_addr
+}
+
 /// looks up a virtual address with the given root table
 /// and returns the physical address
-pub fn table_lookup(table: &Sv39PageTable, virt_addr: u64) -> u64 {
+pub fn table_lookup2(table: &Sv39PageTable, virt_addr: u64) -> u64 {
     // let virt_addr = virt_addr & ((1 << 39) - 1);
     // let index = virt_addr / ONEGIG;
     let (vpn2, vpn1, vpn0) = split_virt_addr_sv39(virt_addr);
