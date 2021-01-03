@@ -1,9 +1,9 @@
 use crate::cpu;
-use crate::println;
+use crate::panic_println;
 use core::panic::PanicInfo;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    println!("[!] Kernel Panic: {}", _info);
+    panic_println!("[!] Kernel Panic: {}", _info);
     cpu::wait_forever()
 }

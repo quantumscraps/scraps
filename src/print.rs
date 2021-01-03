@@ -4,10 +4,40 @@ macro_rules! print {
 	($($args:tt)+) => ({
 			use core::fmt::Write;
 			#[allow(unused_unsafe)]
-			// Safety: !! UNSAFE !!
 			unsafe {
 				let _ = write!(crate::bsp::UART.lock(), $($args)+);
 			}
+	});
+}
+
+/// See [std::panic_print].
+/// # Safety
+/// Safe only to call once.
+#[macro_export]
+macro_rules! panic_print {
+	($($args:tt)+) => ({
+			use core::fmt::Write;
+			#[allow(unused_unsafe)]
+			// Safety: !! UNSAFE !!
+			unsafe {
+				crate::bsp::UART.force_unlock();
+				let _ = write!(crate::bsp::UART.lock(), $($args)+);
+			}
+	});
+}
+/// See [std::println].
+/// # Safety
+/// Safe only to call once.
+#[macro_export]
+macro_rules! panic_println {
+	() => ({
+		$crate::panic_print!("\r\n")
+	});
+	($fmt:expr) => ({
+		$crate::panic_print!(concat!($fmt, "\r\n"))
+	});
+	($fmt:expr, $($args:tt)+) => ({
+		$crate::panic_print!(concat!($fmt, "\r\n"), $($args)+)
 	});
 }
 
