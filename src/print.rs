@@ -6,7 +6,7 @@ macro_rules! print {
 			#[allow(unused_unsafe)]
 			// Safety: !! UNSAFE !!
 			unsafe {
-				let _ = write!(crate::bsp::UNSAFE_UART, $($args)+);
+				let _ = write!(crate::bsp::UART.lock(), $($args)+);
 			}
 	});
 }

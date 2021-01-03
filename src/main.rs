@@ -113,7 +113,7 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     // init allocator
     ALLOCATOR.default_init();
     mmu::init();
-    bsp::UNSAFE_UART.init();
+    bsp::UART.lock().init();
     let v = 12;
     printk!("dtb_addr = {:?}", dtb_addr);
     let r = DevTree::read_totalsize(core::slice::from_raw_parts(

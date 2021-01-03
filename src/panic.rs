@@ -4,6 +4,6 @@ use core::panic::PanicInfo;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    println!("{}", _info);
+    println!("[!] Kernel Panic: {}", _info);
     cpu::wait_forever()
 }
