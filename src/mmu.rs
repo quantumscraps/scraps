@@ -7,7 +7,7 @@ pub struct PagingSetup {
     //                     |       |      phys_end
     //                     |       |      |      permissions
     //                     |       |      |      |
-    pub mappings: BTreeMap<usize, (usize, usize, Permissions)>,
+    mappings: BTreeMap<usize, (usize, usize, Permissions)>,
 }
 
 impl PagingSetup {
@@ -24,12 +24,17 @@ impl PagingSetup {
         phys_end: usize,
         permissions: Permissions,
     ) {
+        assert!(!permissions.is_empty(), "Empty permissions are invalid");
         assert_eq!(
             self.mappings
                 .insert(virt_base, (phys_start, phys_end, permissions)),
             None,
             "Trying to map two ranges at same virt_base!"
         );
+    }
+
+    pub fn mappings(&self) -> &BTreeMap<usize, (usize, usize, Permissions)> {
+        &self.mappings
     }
 }
 

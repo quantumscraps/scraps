@@ -79,25 +79,24 @@ pub trait SvTable: PageTable {
 
     /// Maps a paging setup.
     fn map_page_setup(&mut self, setup: &PagingSetup) {
-        for (&virt_base, &(start, end, permissions)) in setup.mappings.iter() {
+        for (&virt_base, &(start, end, permissions)) in setup.mappings().iter() {
             let permissions_converted = {
-                let mut p = 0;
+                let mut p = XWRPermissions::empty();
                 if permissions.contains(Permissions::Read) {
-                    p |= XWRPermissions::ReadOnly as u8;
+                    p |= XWRPermissions::Read;
                 }
                 if permissions.contains(Permissions::Write) {
-                    p |= XWRPermissions::WriteOnly as u8;
+                    p |= XWRPermissions::Write;
                 }
                 if permissions.contains(Permissions::Execute) {
-                    p |= XWRPermissions::ExecOnly as u8;
+                    p |= XWRPermissions::Execute;
                 }
-                if p == 0 {
-                    // Unreachable since you cannot construct a Permissions
-                    // instance with a value of zero
+                if p.is_empty() {
+                    // Unreachable since an empty Permissions cannot be
+                    // inserted into a PagingSetup
                     unreachable!()
                 } else {
-                    // safe: The only bits that can be set are valid
-                    unsafe { core::mem::transmute::<_, XWRPermissions>(p) }
+                    p
                 }
             };
             self.map_page_range(
@@ -138,17 +137,17 @@ pub trait SvTable: PageTable {
             if ent.valid() && perms == XWRPermissions::Pointer {
                 print!("***");
             } else {
-                if (perms as usize) & (XWRPermissions::ReadOnly as usize) > 0 {
+                if perms.contains(XWRPermissions::Read) {
                     print!("R");
                 } else {
                     print!(" ");
                 }
-                if (perms as usize) & (XWRPermissions::WriteOnly as usize) > 0 {
+                if perms.contains(XWRPermissions::Write) {
                     print!("W");
                 } else {
                     print!(" ");
                 }
-                if (perms as usize) & (XWRPermissions::ExecOnly as usize) > 0 {
+                if perms.contains(XWRPermissions::Execute) {
                     print!("X");
                 } else {
                     print!(" ");
@@ -480,18 +479,34 @@ pub unsafe fn enable_paging<PageSystem: Sv + ?Sized>(table: &PageSystem::Table) 
     // }
 }
 
-#[derive(BitfieldSpecifier, Clone, Copy, PartialEq, Eq)]
-#[bits = 3]
-pub enum XWRPermissions {
-    Pointer = 0b000,
-    ReadOnly = 0b001,
-    WriteOnly = 0b010,
-    ReadWrite = 0b011,
-    ExecOnly = 0b100,
-    ReadExec = 0b101,
-    WriteExec = 0b110,
-    ReadWriteExec = 0b111,
+#[allow(non_upper_case_globals)]
+mod permissions_inner {
+    use modular_bitfield::{error::*, Specifier};
+
+    bitflags::bitflags! {
+        pub struct XWRPermissions: u8 {
+            const Pointer = 0b000;
+            const Read = 0b001;
+            const Write = 0b010;
+            const Execute = 0b100;
+        }
+    }
+
+    impl Specifier for XWRPermissions {
+        type Bytes = u8;
+        type InOut = Self;
+        const BITS: usize = 3;
+
+        fn into_bytes(input: Self::InOut) -> Result<Self::Bytes, OutOfBounds> {
+            Ok(input.bits)
+        }
+
+        fn from_bytes(bytes: Self::Bytes) -> Result<Self::InOut, InvalidBitPattern<Self::Bytes>> {
+            Self::from_bits(bytes).ok_or(InvalidBitPattern::new(bytes))
+        }
+    }
 }
+pub use permissions_inner::XWRPermissions;
 
 #[inline(never)]
 pub const unsafe fn init() {}
