@@ -1,5 +1,5 @@
 use crate::{
-    arch::mmu::{map_page_setup as arch_map_page_setup, Sv39},
+    arch::mmu::{Sv, Sv39},
     drivers::ns16550a::NS16550A,
     mmu::{PageTable, PagingSetup},
 };
@@ -19,7 +19,7 @@ pub const NANOS_PER_TICK: u64 = 1;
 pub const HAS_RDTIME: bool = false;
 
 pub fn map_page_setup(setup: &PagingSetup) -> &mut impl PageTable {
-    arch_map_page_setup::<Sv39>(setup)
+    <Sv39 as Sv>::Table::from_page_setup(setup)
 }
 
 pub const HEAP_SIZE: usize = 0x100000; // PAGE_SIZE * 1048576; // 1m allocations=

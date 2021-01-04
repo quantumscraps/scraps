@@ -35,6 +35,9 @@ impl PagingSetup {
 
 /// Common interface implemented by all page tables.
 pub trait PageTable: Sized {
+    /// Creates an instance of this page table from a page setup.
+    fn from_page_setup<'a, 'b>(setup: &'a PagingSetup) -> &'b mut Self;
+
     /// Prints a fancy representation of this page table.
     fn print(&self);
 

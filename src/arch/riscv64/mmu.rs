@@ -283,6 +283,24 @@ impl<T: SvTable<Sv = U>, U: Sv<Table = T>> PageTable for T {
     fn virt_to_phys(&self, virt_addr: usize) -> usize {
         SvTable::virt_to_phys(self, virt_addr as _) as _
     }
+
+    fn from_page_setup<'a, 'b>(setup: &'a PagingSetup) -> &'b mut Self {
+        // Create a root table
+        let root_table_addr = unsafe { &mut ALLOCATOR }
+            .try_zallocate(PAGE_SIZE)
+            .expect("Couldn't allocate page!");
+        printk!("Root table addr = {}", root_table_addr as usize);
+        printk!(
+            "root_addr % PAGE_SIZE = {}",
+            root_table_addr as usize % PAGE_SIZE
+        );
+        let root_table = unsafe { T::cast_page_table(root_table_addr) };
+
+        // Mapping with Sv39
+        root_table.map_page_setup(setup);
+
+        root_table
+    }
 }
 
 impl SvTable for Sv39Table {
@@ -473,24 +491,6 @@ pub enum XWRPermissions {
     ReadExec = 0b101,
     WriteExec = 0b110,
     ReadWriteExec = 0b111,
-}
-
-pub fn map_page_setup<PageSystem: Sv>(setup: &PagingSetup) -> &mut PageSystem::Table {
-    // Create a root table
-    let root_table_addr = unsafe { &mut ALLOCATOR }
-        .try_zallocate(PAGE_SIZE)
-        .expect("Couldn't allocate page!");
-    printk!("Root table addr = {}", root_table_addr as usize);
-    printk!(
-        "root_addr % PAGE_SIZE = {}",
-        root_table_addr as usize % PAGE_SIZE
-    );
-    let root_table = unsafe { PageSystem::Table::cast_page_table(root_table_addr) };
-
-    // Mapping with Sv39
-    root_table.map_page_setup(setup);
-
-    root_table
 }
 
 #[inline(never)]
