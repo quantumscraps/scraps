@@ -99,7 +99,7 @@ pub fn lookup_dtb_entry<'dt>(
 }
 
 /// Used to test if paging worked
-//const PAGING_TEST: usize = 0x1010101010101010;
+const PAGING_TEST: usize = 0x1010101010101010;
 
 /// The early entry point for initializing the OS.
 /// Paging, DTB, etc. are setup here.
@@ -181,7 +181,6 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     //     time::time_counter().wait_for(Duration::from_secs(1));
     // }
     //cpu::wait_forever()
-    /*printk!("Allocating root table...");
     #[cfg(target_arch = "riscv64")]
     {
         printk!("Enabling S-mode...");
@@ -190,10 +189,10 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     #[cfg(not(target_arch = "riscv64"))]
     {
         printk!("Unsupported for non-RISCV platforms, for now");
-    }*/
+    }
     cpu::wait_forever()
 }
-/*
+
 unsafe fn kinit2() -> ! {
     // let root_table_addr = ALLOCATOR
     //     .try_zallocate(PAGE_SIZE)
@@ -267,4 +266,3 @@ unsafe fn kinit2() -> ! {
     );
     cpu::wait_forever()
 }
-*/
