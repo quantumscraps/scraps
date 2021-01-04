@@ -39,7 +39,7 @@ use driver_interfaces::*;
 use fdt_rs::base::DevTree;
 use fdt_rs::index::{DevTreeIndex, DevTreeIndexItem};
 use fdt_rs::prelude::*;
-use mmu::{enable_paging, enable_smode, map_page, map_page_range, table_lookup, Sv39PageTable};
+use mmu::{enable_smode, PageTable, PagingSetup, Permissions};
 use physical_page_allocator::{ALLOCATOR, PAGE_SIZE};
 
 /// Creates a static ref to a linker variable
@@ -195,58 +195,61 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
 }
 /*
 unsafe fn kinit2() -> ! {
-    let root_table_addr = ALLOCATOR
-        .try_zallocate(PAGE_SIZE)
-        .expect("Couldn't allocate page!");
-    printk!("Root table addr = {}", root_table_addr as usize);
-    printk!(
-        "root_addr % PAGE_SIZE = {}",
-        root_table_addr as usize % PAGE_SIZE
-    );
-    // Rust is smart :)
-    let root_table: &mut Sv39PageTable = &mut *(root_table_addr as *mut _);
+    // let root_table_addr = ALLOCATOR
+    //     .try_zallocate(PAGE_SIZE)
+    //     .expect("Couldn't allocate page!");
+    // printk!("Root table addr = {}", root_table_addr as usize);
+    // printk!(
+    //     "root_addr % PAGE_SIZE = {}",
+    //     root_table_addr as usize % PAGE_SIZE
+    // );
+    // // Rust is smart :)
+    // let root_table = PAGING_SYSTEM.cast_page_table(root_table_addr);
 
     link_var!(__kern_start);
     link_var!(__kern_end);
-    let page_size_u64 = PAGE_SIZE as u64;
-    let kern_addr = &__kern_start as *const _ as u64;
-    let kern_end_addr = &__kern_end as *const _ as u64;
+    let kern_addr = &__kern_start as *const _ as usize;
+    let kern_end_addr = &__kern_end as *const _ as usize;
     assert!(kern_end_addr > kern_addr);
     // let onegig = 0x40000000u64;
-    let kern_addr_rounded = kern_addr & !(page_size_u64 - 1);
+    let kern_addr_rounded = kern_addr & !(PAGE_SIZE - 1);
+    let mut setup = PagingSetup::new();
     // let kern_end_rounded = if kern_end_addr % page_size_u64 != 0 {
     //     ((kern_end_addr / page_size_u64) + 1) * page_size_u64
     // } else {
     //     kern_end_addr
     // };
     printk!("Mapping UART addr = 0x{:x}", 0x1000_0000);
-    map_page(root_table, 0x1000_0000, 0x1000_0000);
+    // 8 bytes should be enough
+    setup.map(0x1000_0000, 0x1000_0000, 0x1000_0008, Permissions::RWX);
     printk!("Mapping kern_addr (rounded) ~= 0x{:x}", kern_addr_rounded);
-    map_page_range(root_table, kern_addr, kern_end_addr, kern_addr);
+    setup.map(kern_addr, kern_addr, kern_end_addr, Permissions::RWX);
     // 1) identity map
     // map_gigapage(root_table, kern_addr, kern_addr);
-    let hh_base = 0x2000000000u64;
-    let hh_end = kern_end_addr - kern_addr + hh_base;
+    let hh_base = 0x2000000000usize;
+    let _hh_end = kern_end_addr - kern_addr + hh_base;
     printk!("Mapping hh_addr ~= 0x{:x}", hh_base);
     // 2) let the higher half be something like 0x2000000000
     // map_gigapage(root_table, hh_base, kern_addr);
-    map_page_range(root_table, hh_base, hh_end, kern_addr);
+    setup.map(hh_base, kern_addr, kern_end_addr, Permissions::RWX);
+    // Convert to arch specific page table
+    let root_table = bsp::map_page_setup(&setup);
     root_table.print();
     // calculate addresses for identity and hh of PAGING_TEST
-    let paging_test_identity_addr = &PAGING_TEST as *const _ as u64;
+    let paging_test_identity_addr = &PAGING_TEST as *const _ as usize;
     // round kern_addr to 1g
     let paging_test_hh_addr = paging_test_identity_addr - kern_addr_rounded + hh_base;
     // enable paging and jump to higher half too
     // let kinit2_hh_addr = (kinit2 as u64) - kern_addr_rounded + hh_base;
     printk!(
         "Looking up PAGING_TEST from hh map =       0x{:x}",
-        table_lookup(root_table, paging_test_hh_addr)
+        root_table.virt_to_phys(paging_test_hh_addr as _)
     );
     printk!(
         "Looking up PAGING_TEST from identity map = 0x{:x}",
-        table_lookup(root_table, paging_test_identity_addr)
+        root_table.virt_to_phys(paging_test_identity_addr as _)
     );
-    enable_paging(root_table);
+    root_table.enable();
     let satp_value: u64;
     asm!("csrr {0}, satp", out(reg) satp_value);
     printk!("Read SATP = 0b{:064b}", satp_value);

@@ -1,4 +1,9 @@
-use crate::drivers::ns16550a::NS16550A;
+use crate::{
+    drivers::ns16550a::NS16550A,
+    mmu::{PageTable, PagingSetup, Sv, Sv39, SvTable},
+    physical_page_allocator::ALLOCATOR,
+    printk,
+};
 use spin::Mutex;
 
 pub static UART: Mutex<NS16550A> = Mutex::new(NS16550A::new(0x1000_0000));
@@ -14,5 +19,24 @@ pub const TICKS_PER_NANO: u64 = 3; // 10 / 4 ~= 3, should probably add floats th
 pub const NANOS_PER_TICK: u64 = 1;
 pub const HAS_RDTIME: bool = false;
 
-pub const HEAP_SIZE: usize = 0x100000; // PAGE_SIZE * 1048576; // 1m allocations
-pub const PAGE_SIZE: usize = 4096;
+pub fn map_page_setup(setup: &PagingSetup) -> &mut impl PageTable {
+    // Create a root table
+    let root_table_addr = unsafe { &mut ALLOCATOR }
+        .try_zallocate(PAGE_SIZE)
+        .expect("Couldn't allocate page!");
+    printk!("Root table addr = {}", root_table_addr as usize);
+    printk!(
+        "root_addr % PAGE_SIZE = {}",
+        root_table_addr as usize % PAGE_SIZE
+    );
+    let root_table = unsafe { <Sv39 as Sv>::Table::cast_page_table(root_table_addr) };
+
+    // Mapping with Sv39
+    root_table.map_page_setup(setup);
+
+    root_table
+}
+
+pub const HEAP_SIZE: usize = 0x100000; // PAGE_SIZE * 1048576; // 1m allocations=
+
+pub use crate::arch::mmu::PAGE_SIZE;
