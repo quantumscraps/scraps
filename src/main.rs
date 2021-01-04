@@ -193,6 +193,7 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     cpu::wait_forever()
 }
 
+#[cfg(target_arch = "riscv64")]
 unsafe fn kinit2() -> ! {
     // let root_table_addr = ALLOCATOR
     //     .try_zallocate(PAGE_SIZE)
