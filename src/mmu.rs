@@ -1,4 +1,3 @@
-pub use crate::arch::mmu::*;
 use alloc::collections::BTreeMap;
 
 /// MMU abstraction that can be evaluated by any paging system.

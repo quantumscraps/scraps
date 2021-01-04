@@ -39,7 +39,7 @@ use driver_interfaces::*;
 use fdt_rs::base::DevTree;
 use fdt_rs::index::{DevTreeIndex, DevTreeIndexItem};
 use fdt_rs::prelude::*;
-use mmu::{enable_smode, PageTable, PagingSetup, Permissions};
+use mmu::{PageTable, PagingSetup, Permissions};
 use physical_page_allocator::{ALLOCATOR, PAGE_SIZE};
 
 /// Creates a static ref to a linker variable
@@ -112,7 +112,7 @@ const PAGING_TEST: usize = 0x1010101010101010;
 pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     // init allocator
     ALLOCATOR.default_init();
-    mmu::init();
+    arch::mmu::init();
     bsp::UART.lock().init();
     let v = 12;
     printk!("dtb_addr = {:?}", dtb_addr);
@@ -184,7 +184,7 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     #[cfg(target_arch = "riscv64")]
     {
         printk!("Enabling S-mode...");
-        enable_smode(kinit2 as usize);
+        crate::arch::mmu::enable_smode(kinit2 as usize);
     }
     #[cfg(not(target_arch = "riscv64"))]
     {
