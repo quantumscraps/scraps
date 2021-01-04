@@ -34,6 +34,8 @@ register_bitfields! {
     ],
     // Line Status Register
     LSR [
+        // Transmitter Empty
+        TEMT OFFSET(6) NUMBITS(0b1) [],
         // Data Ready
         DR OFFSET(0) NUMBITS(0b1) []
     ]
@@ -111,6 +113,8 @@ impl Uart for NS16550A {
     fn put(&mut self, value: u8) {
         // safety: this function is only called if base address is valid.
         let regs = unsafe { self.regs() };
+        // Wait for empty transmitter
+        while regs.LSR.matches_all(LSR::TEMT::CLEAR) {}
         // just set the value
         regs.RBR.set(value)
     }
