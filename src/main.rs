@@ -4,8 +4,11 @@
 #![feature(const_generics)]
 #![feature(const_evaluatable_checked)] // NOTE: const_evaluatable_unchecked isn't a thing !!
 #![feature(const_panic)]
+#![feature(const_ptr_offset)]
+#![feature(const_size_of_val)]
 #![feature(default_alloc_error_handler)]
 #![feature(label_break_value)]
+#![feature(layout_for_ptr)]
 #![feature(naked_functions)]
 #![allow(incomplete_features)]
 #![deny(missing_docs)]
@@ -31,10 +34,11 @@ mod panic;
 mod physical_page_allocator;
 mod print;
 mod time;
-//mod util;
+mod util;
 
 use alloc::string::String;
 use alloc::vec::Vec;
+use cpu::{mtime, mtimecmp};
 use driver_interfaces::*;
 use fdt_rs::base::DevTree;
 use fdt_rs::index::{DevTreeIndex, DevTreeIndexItem};
@@ -184,7 +188,7 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     #[cfg(target_arch = "riscv64")]
     {
         printk!("Enabling S-mode...");
-        crate::arch::mmu::enable_smode(kinit2 as usize);
+        crate::arch::mmu::enable_smode(kinit2 as usize, 0);
     }
     #[cfg(not(target_arch = "riscv64"))]
     {
@@ -222,6 +226,20 @@ unsafe fn kinit2() -> ! {
     printk!("Mapping UART addr = 0x{:x}", 0x1000_0000);
     // 8 bytes should be enough
     setup.map(0x1000_0000, 0x1000_0000, 0x1000_0008, Permissions::RWX);
+    printk!("Mapping mtime addr = 0x{:x}", mtime as usize);
+    setup.map(
+        mtime as usize,
+        mtime as usize,
+        mtime as usize + core::mem::size_of_val_raw(mtime),
+        Permissions::RWX,
+    );
+    printk!("Mapping mtimecmp addr = 0x{:x}", mtimecmp as usize);
+    setup.map(
+        mtimecmp as usize,
+        mtimecmp as usize,
+        mtimecmp as usize + core::mem::size_of_val_raw(mtime),
+        Permissions::RWX,
+    );
     printk!("Mapping kern_addr (rounded) ~= 0x{:x}", kern_addr_rounded);
     setup.map(kern_addr, kern_addr, kern_end_addr, Permissions::RWX);
     // 1) identity map
@@ -265,5 +283,16 @@ unsafe fn kinit2() -> ! {
         "PAGING_TEST from hh map:       {:x}",
         *(paging_test_hh_addr as *const usize)
     );
-    cpu::wait_forever()
+
+    // do a timer interrupt
+    mtimecmp.write_volatile(mtime.read_volatile() + 20_000_000);
+    (0 as *mut u8).write_volatile(0);
+
+    loop {
+        printk!("mtime = {}", *mtime);
+        use crate::time::TimeCounter;
+        crate::time::time_counter().wait_for(core::time::Duration::from_millis(300));
+    }
+
+    //cpu::wait_forever()
 }

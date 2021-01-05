@@ -429,15 +429,19 @@ impl SvTable for Sv39Table {
 /// Enables S-mode
 ///
 /// # Safety
-/// The return address must be pointing to a valid instruction.
-pub unsafe fn enable_smode(return_to: usize) {
+/// The return address and trap vector must be pointing to a valid instruction.
+/// Additionally, the trap vector's address must be aligned to 4 bytes.
+pub unsafe fn enable_smode(return_to: usize, trap_vector: usize) {
+    assert!(trap_vector % 4 == 0, "Trap vector is not properly aligned!");
     printk!("setting mstatus to s-mode, zeroing mie");
-    let mstatus_val = 1 << 11; // | (1 << 5);
-    asm!(
-        "csrw mstatus, {0}",
-        in(reg) mstatus_val,
-    );
-    asm!("csrw mie, zero");
+    let mstatus_val = 1 << 11 | 1 << 7;
+    asm!("csrw mstatus, {0}", in(reg) mstatus_val);
+    // bottom two bits are mode, and leaving at zero
+    // is direct, which works for now
+    let _mtvec_val = trap_vector << 2;
+    //printk!("setting mtvec to given value...");
+    //asm!("csrw mtvec, {0}", in(reg) mtvec_val);
+    //asm!("csrw mie, zero");
     printk!("setting mepc to part2...");
     asm!(
         "csrw mepc, {0}",

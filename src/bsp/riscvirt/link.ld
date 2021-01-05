@@ -6,7 +6,10 @@ SECTIONS
     PROVIDE(__kern_start = .);
     .text : {
         PROVIDE(__text_start = .);
-        *(.text.init) *(.text .text.*)
+        *(.text.init)
+        . = ALIGN(4);
+        *(.text.trap)
+        *(.text .text.*)
         PROVIDE(__text_end = .);
     }
     PROVIDE(__global_pointer = .);
