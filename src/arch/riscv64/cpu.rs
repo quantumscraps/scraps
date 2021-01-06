@@ -1,5 +1,7 @@
 use crate::{bsp::UART, printk2};
 
+use super::INTERRUPT_CONTROLLER;
+
 #[inline(always)]
 pub fn wait_forever() -> ! {
     // Safety: Never returns
@@ -51,11 +53,6 @@ static mut __trap_frame: TrapFrame = TrapFrame::from_stack(unsafe {
 #[allow(non_upper_case_globals)]
 static mut __trap_stack: [u8; 1024] = [0; 1024];
 
-#[allow(non_upper_case_globals)]
-pub const mtime: *const u64 = 0x0200_bff8 as *const u64;
-#[allow(non_upper_case_globals)]
-pub const mtimecmp: *mut u64 = 0x0200_4000 as *mut u64;
-
 #[no_mangle]
 extern "C" fn trap_vector(
     epc: usize,
@@ -69,6 +66,7 @@ extern "C" fn trap_vector(
     let cause_num = cause & 0xfff;
     let mut return_pc = epc;
     let uart_mut = unsafe { crate::util::get_mutex_mut(&UART) };
+    let clint = unsafe { crate::util::get_mutex_mut(&INTERRUPT_CONTROLLER) };
     // let orig_uart_locked = UART.is_locked();
     // unsafe { UART.force_unlock() };
 
@@ -88,9 +86,9 @@ extern "C" fn trap_vector(
         match cause_num {
             // timer
             7 => {
-                printk2!(uart_mut, "Timer interrupt! mtime = {}", unsafe { *mtime });
+                printk2!(uart_mut, "Timer interrupt! mtime = {}", clint.mtime());
                 printk2!(uart_mut, "Rescheduling mtimecmp to 2s from now...");
-                unsafe { mtimecmp.write_volatile(mtime.read_volatile() + 20_000_000) };
+                clint.set_mtimecmp(clint.mtime() + 20_000_000);
             }
             _ => {}
         }

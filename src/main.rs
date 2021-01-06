@@ -38,7 +38,7 @@ mod util;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use cpu::{mtime, mtimecmp};
+use arch::INTERRUPT_CONTROLLER;
 use driver_interfaces::*;
 use fdt_rs::base::DevTree;
 use fdt_rs::index::{DevTreeIndex, DevTreeIndexItem};
@@ -120,35 +120,63 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     bsp::UART.lock().init();
     let v = 12;
     printk!("dtb_addr = {:?}", dtb_addr);
-    let r = DevTree::read_totalsize(core::slice::from_raw_parts(
-        dtb_addr as *const _,
-        DevTree::MIN_HEADER_SIZE,
-    ))
-    .and_then(|size| DevTree::new(core::slice::from_raw_parts(dtb_addr as *const _, size)));
-    if let Ok(r) = r {
-        printk!("Success reading DTB");
-        if let Ok(layout) = DevTreeIndex::get_layout(&r) {
-            printk!("Got DTB index layout");
-            let mut ivec = alloc::vec![0u8; layout.size() + layout.align()];
-            if let Ok(index) = DevTreeIndex::new(r, ivec.as_mut_slice()) {
-                printk!("Created index");
-                if let Some(DevTreeIndexItem::Prop(prop)) =
-                    lookup_dtb_entry(&index, "/chosen/bootargs")
-                {
-                    printk!("cmdline = {}", prop.str().unwrap());
-                }
+    let dtb = {
+        let r = DevTree::read_totalsize(core::slice::from_raw_parts(
+            dtb_addr as *const _,
+            DevTree::MIN_HEADER_SIZE,
+        ))
+        .and_then(|size| DevTree::new(core::slice::from_raw_parts(dtb_addr as *const _, size)));
+        match r {
+            Ok(r) => {
+                printk!("Success reading DTB");
+                r
             }
+            Err(e) => panic!("Failed to read dtb error = {:?}", e),
+        }
+    };
+    let dtb_index_size = {
+        if let Ok(layout) = DevTreeIndex::get_layout(&dtb) {
+            printk!("Got DTB index layout, size = {} bytes", layout.size());
+            layout.size() + layout.align()
+        } else {
+            panic!("Failed to get DTB index layout")
         }
         /*for item in r.struct_items() {
             if let Ok(name) = item.name() {
                 printk!("Name = {}", name);
             }
         }*/
-        for entry in r.reserved_entries() {
-            printk!("reserved: {:?}, {:?}", entry.address, entry.size);
+    };
+    let mut dtb_index_backing = alloc::vec![0u8; dtb_index_size];
+    let dtb = {
+        if let Ok(index) = DevTreeIndex::new(dtb, dtb_index_backing.as_mut_slice()) {
+            printk!("Created index");
+            index
+        } else {
+            panic!("Failed to create DTB index")
         }
-    } else if let Err(e) = r {
-        printk!("Failed to read dtb error = {:?}", e);
+    };
+    if let Some(DevTreeIndexItem::Prop(prop)) = lookup_dtb_entry(&dtb, "/chosen/bootargs") {
+        printk!("cmdline = {}", prop.str().unwrap());
+    }
+    for entry in dtb.fdt().reserved_entries() {
+        printk!("reserved: {:?}, {:?}", entry.address, entry.size);
+    }
+    #[cfg(target_arch = "riscv64")]
+    {
+        let clint_node = dtb
+            .compatible_nodes("riscv,clint0")
+            .next()
+            .expect("Couldn't find CLINT!");
+        let clint_addr = clint_node
+            .props()
+            .filter(|prop| prop.name() == Ok("reg"))
+            .next()
+            .expect("Couldn't find CLINT reg property")
+            .u64(0)
+            .expect("Couldn't read CLINT reg property");
+        // Setup CLINT address
+        *INTERRUPT_CONTROLLER.lock() = arch::drivers::CLINT::new(clint_addr as _);
     }
     printk!("Address of some stack variable is {:?}", (&v as *const _));
     printk!(
@@ -187,6 +215,8 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     //cpu::wait_forever()
     #[cfg(target_arch = "riscv64")]
     {
+        printk!("Setting up CLINT from DTB...");
+
         printk!("Enabling S-mode...");
         crate::arch::mmu::enable_smode(kinit2 as usize, 0);
     }
@@ -226,6 +256,10 @@ unsafe fn kinit2() -> ! {
     printk!("Mapping UART addr = 0x{:x}", 0x1000_0000);
     // 8 bytes should be enough
     setup.map(0x1000_0000, 0x1000_0000, 0x1000_0008, Permissions::RWX);
+    let (mtime, mtimecmp) = {
+        let clint = INTERRUPT_CONTROLLER.lock();
+        (clint.mtime_address(), clint.mtimecmp_address())
+    };
     printk!("Mapping mtime addr = 0x{:x}", mtime as usize);
     setup.map(
         mtime as usize,
