@@ -31,7 +31,9 @@ pub struct TrapFrame {
 }
 
 impl TrapFrame {
-    const fn from_stack(sp: *mut u8) -> Self {
+    /// # Safety
+    /// Only safe if the sp points to a valid address.
+    const unsafe fn from_stack(sp: *mut u8) -> Self {
         Self {
             regs: [0; 32],
             fregs: [0.; 32],
@@ -45,9 +47,9 @@ impl TrapFrame {
 /// This is written to mscratch to store the trap frame.
 #[allow(non_upper_case_globals)]
 #[no_mangle]
-static mut __trap_frame: TrapFrame = TrapFrame::from_stack(unsafe {
-    (__trap_stack.as_mut_ptr()).add(core::mem::size_of_val(&__trap_stack))
-});
+static mut __trap_frame: TrapFrame = unsafe {
+    TrapFrame::from_stack((__trap_stack.as_mut_ptr()).add(core::mem::size_of_val(&__trap_stack)))
+};
 
 /// Stack storage. 1kb to encourage keeping trap handlers small.
 #[allow(non_upper_case_globals)]
@@ -65,8 +67,8 @@ extern "C" fn trap_vector(
     let is_async = cause >> 63 & 1 == 1;
     let cause_num = cause & 0xfff;
     let mut return_pc = epc;
-    let uart_mut = unsafe { crate::util::get_mutex_mut(&UART) };
-    let clint = unsafe { crate::util::get_mutex_mut(&INTERRUPT_CONTROLLER) };
+    let uart_mut = unsafe { UART.get_mut() };
+    let clint = unsafe { INTERRUPT_CONTROLLER.get_mut() };
     // let orig_uart_locked = UART.is_locked();
     // unsafe { UART.force_unlock() };
 

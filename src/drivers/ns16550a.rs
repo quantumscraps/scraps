@@ -58,14 +58,14 @@ pub struct NS16550A {
 }
 
 impl NS16550A {
-    pub const fn new(base_address: usize) -> Self {
+    /// # Safety
+    /// The given base address must be valid.
+    pub const unsafe fn new(base_address: usize) -> Self {
         Self { base_address }
     }
 
-    /// # Safety
-    /// This UART's base address must be pointing to a valid MMIO address.
-    unsafe fn regs(&mut self) -> &UARTBlock {
-        &*(self.base_address as *const UARTBlock)
+    fn regs(&mut self) -> &UARTBlock {
+        unsafe { &*(self.base_address as *const UARTBlock) }
     }
 }
 
@@ -79,7 +79,7 @@ impl core::fmt::Write for NS16550A {
 }
 
 impl Uart for NS16550A {
-    unsafe fn init(&mut self) {
+    fn init(&mut self) {
         let regs = self.regs();
         // Word length = 8 bits
         regs.LCR.write(LCR::WLS::EightBits);
@@ -101,8 +101,7 @@ impl Uart for NS16550A {
     }
 
     fn get(&mut self) -> Option<u8> {
-        // safety: this function is only called if base address is valid.
-        let regs = unsafe { self.regs() };
+        let regs = self.regs();
         // check if data is ready
         match regs.LSR.matches_all(LSR::DR::SET) {
             true => Some(regs.RBR.get()),
@@ -112,7 +111,7 @@ impl Uart for NS16550A {
 
     fn put(&mut self, value: u8) {
         // safety: this function is only called if base address is valid.
-        let regs = unsafe { self.regs() };
+        let regs = self.regs();
         // Wait for empty transmitter
         while regs.LSR.matches_all(LSR::TEMT::CLEAR) {}
         // just set the value

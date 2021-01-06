@@ -39,6 +39,9 @@ pub trait SvTable: PageTable {
     const ENTRIES: usize;
 
     /// Unsafely casts a *mut u8 to this paging system's page table.
+    ///
+    /// # Safety
+    /// Only safe if the given pointer points to an unused page.
     unsafe fn cast_page_table<'a>(ptr: *mut u8) -> &'a mut Self {
         &mut *(ptr as *mut Self)
     }

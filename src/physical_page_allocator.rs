@@ -80,7 +80,7 @@ where
     /// Initializes with the given start value.
     ///
     /// # Safety
-    /// Inherently unsafe to call since the start value cannot be validated.
+    /// Only safe to call if the start address is valid.
     pub unsafe fn init(&mut self, start: usize) {
         self.start = start;
     }
@@ -137,7 +137,7 @@ where
     pub fn try_zallocate(&mut self, size: usize) -> Option<*mut u8> {
         let pages = match self.try_allocate(size) {
             Some(pointer) => pointer,
-            None => return None
+            None => return None,
         };
         let slice = unsafe { core::slice::from_raw_parts_mut(pages, size) };
         for thing in slice.iter_mut() {
