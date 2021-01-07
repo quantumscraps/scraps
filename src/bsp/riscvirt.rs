@@ -1,12 +1,8 @@
 use crate::{
     arch::mmu::{Sv, Sv39},
-    drivers::ns16550a::NS16550A,
     mmu::{PageTable, PagingSetup},
-    util::UnsafeMutex,
 };
 
-pub static UART: UnsafeMutex<NS16550A> = UnsafeMutex::new(unsafe { NS16550A::new(0x1000_0000) });
-//pub static mut UNSAFE_UART: NS16550A = NS16550A::new(0x1000_0000);
 // Dumped dtb with `-M virt,dumpdtb=virt.out` to check timebase_freq
 // which is 10,000,000
 // Linux also uses HZ which is default to 1000

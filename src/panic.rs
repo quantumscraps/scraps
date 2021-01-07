@@ -1,9 +1,9 @@
-use crate::cpu;
-use crate::panic_println;
+use crate::{cpu, println2, STDOUT};
 use core::panic::PanicInfo;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    panic_println!("[!] Kernel Panic: {}", _info);
+    let stdout = unsafe { STDOUT.get_mut() };
+    println2!(stdout, "[!] Kernel Panic: {}", _info);
     cpu::wait_forever()
 }

@@ -1,4 +1,5 @@
 #![feature(asm)]
+#![feature(alloc_prelude)]
 #![feature(global_asm)]
 #![feature(const_fn)]
 #![feature(const_generics)]
@@ -36,15 +37,15 @@ mod print;
 mod time;
 mod util;
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::prelude::v1::*;
 use arch::INTERRUPT_CONTROLLER;
-use driver_interfaces::*;
+use driver_interfaces::Console;
 use fdt_rs::base::DevTree;
 use fdt_rs::index::{DevTreeIndex, DevTreeIndexItem};
 use fdt_rs::prelude::*;
 use mmu::{PageTable, PagingSetup, Permissions};
 use physical_page_allocator::{ALLOCATOR, PAGE_SIZE};
+use util::UnsafeMutex;
 
 /// Creates a static ref to a linker variable
 #[macro_export]
@@ -105,6 +106,9 @@ pub fn lookup_dtb_entry<'dt>(
 /// Used to test if paging worked
 const PAGING_TEST: usize = 0x1010101010101010;
 
+/// Default output device
+static STDOUT: UnsafeMutex<Option<Box<dyn Console>>> = UnsafeMutex::new(None);
+
 /// The early entry point for initializing the OS.
 /// Paging, DTB, etc. are setup here.
 ///
@@ -117,9 +121,9 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     // init allocator
     ALLOCATOR.default_init();
     arch::mmu::init();
-    bsp::UART.lock().init();
+    //bsp::UART.lock().init();
     let v = 12;
-    printk!("dtb_addr = {:?}", dtb_addr);
+    //printk!("dtb_addr = {:?}", dtb_addr);
     let dtb = {
         let r = DevTree::read_totalsize(core::slice::from_raw_parts(
             dtb_addr as *const _,
@@ -128,7 +132,7 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
         .and_then(|size| DevTree::new(core::slice::from_raw_parts(dtb_addr as *const _, size)));
         match r {
             Ok(r) => {
-                printk!("Success reading DTB");
+                //printk!("Success reading DTB");
                 r
             }
             Err(e) => panic!("Failed to read dtb error = {:?}", e),
@@ -136,7 +140,7 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     };
     let dtb_index_size = {
         if let Ok(layout) = DevTreeIndex::get_layout(&dtb) {
-            printk!("Got DTB index layout, size = {} bytes", layout.size());
+            //printk!("Got DTB index layout, size = {} bytes", layout.size());
             layout.size() + layout.align()
         } else {
             panic!("Failed to get DTB index layout")
@@ -150,12 +154,17 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     let mut dtb_index_backing = alloc::vec![0u8; dtb_index_size];
     let dtb = {
         if let Ok(index) = DevTreeIndex::new(dtb, dtb_index_backing.as_mut_slice()) {
-            printk!("Created index");
+            //printk!("Created index");
             index
         } else {
             panic!("Failed to create DTB index")
         }
     };
+    // setup stdout
+    drivers::detect_stdout(&dtb);
+    if let Some(ref mut stdout) = *STDOUT.lock() {
+        stdout.init();
+    }
     if let Some(DevTreeIndexItem::Prop(prop)) = lookup_dtb_entry(&dtb, "/chosen/bootargs") {
         printk!("cmdline = {}", prop.str().unwrap());
     }
@@ -177,6 +186,7 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
             .expect("Couldn't read CLINT reg property");
         // Setup CLINT address
         *INTERRUPT_CONTROLLER.lock() = arch::drivers::CLINT::new(clint_addr as _);
+        printk!("Setup CLINT");
     }
     printk!("Address of some stack variable is {:?}", (&v as *const _));
     printk!(
@@ -198,6 +208,7 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
         ALLOCATOR.print_page_allocation_table();
     }
     // Allocate and reserve a vec
+    printk!("stdout = {:?}", STDOUT);
     printk!("Allocating a vec<string> and reserving 37 items, then pushing a bunch of strings...");
     let mut v: Vec<String> = Vec::with_capacity(37);
     for _ in 0..37 {
@@ -215,8 +226,6 @@ pub unsafe extern "C" fn kinit(dtb_addr: *mut u8) -> ! {
     //cpu::wait_forever()
     #[cfg(target_arch = "riscv64")]
     {
-        printk!("Setting up CLINT from DTB...");
-
         printk!("Enabling S-mode...");
         crate::arch::mmu::enable_smode(kinit2 as usize, 0);
     }
@@ -254,6 +263,7 @@ unsafe fn kinit2() -> ! {
     //     kern_end_addr
     // };
     printk!("Mapping UART addr = 0x{:x}", 0x1000_0000);
+    printk!("Used/total = {}/{}", ALLOCATOR.used(), ALLOCATOR.total());
     // 8 bytes should be enough
     setup.map(0x1000_0000, 0x1000_0000, 0x1000_0008, Permissions::RWX);
     let (mtime, mtimecmp) = {
@@ -328,5 +338,5 @@ unsafe fn kinit2() -> ! {
         crate::time::time_counter().wait_for(core::time::Duration::from_millis(300));
     }
 
-    //cpu::wait_forever()
+    // cpu::wait_forever()
 }

@@ -1,4 +1,4 @@
-use core::{cell::UnsafeCell, ops::Deref};
+use core::{cell::UnsafeCell, fmt::Debug, ops::Deref};
 
 use spin::Mutex;
 
@@ -34,3 +34,9 @@ impl<T> UnsafeMutex<T> {
 
 unsafe impl<T> Sync for UnsafeMutex<T> {}
 unsafe impl<T> Send for UnsafeMutex<T> {}
+
+impl<T: Debug> Debug for UnsafeMutex<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "UnsafeMutex({:?})", self.0)
+    }
+}

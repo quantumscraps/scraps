@@ -172,6 +172,19 @@ where
             *descriptor = (*descriptor) & !PageFlags::Taken.val() | PageFlags::Free.val();
         }
     }
+
+    /// Gets the number of used pages.
+    pub fn used(&self) -> usize {
+        self.descriptors
+            .iter()
+            .filter(|&&d| d & PageFlags::Taken.val() != 0)
+            .count()
+    }
+
+    /// Gets the total number of pages.
+    pub const fn total(&self) -> usize {
+        self.descriptors.len()
+    }
 }
 
 const fn size_to_pages(size: usize) -> usize {

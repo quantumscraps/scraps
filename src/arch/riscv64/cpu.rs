@@ -1,4 +1,4 @@
-use crate::{bsp::UART, printk2};
+use crate::{printk2, STDOUT};
 
 use super::INTERRUPT_CONTROLLER;
 
@@ -67,13 +67,13 @@ extern "C" fn trap_vector(
     let is_async = cause >> 63 & 1 == 1;
     let cause_num = cause & 0xfff;
     let mut return_pc = epc;
-    let uart_mut = unsafe { UART.get_mut() };
+    let stdout = unsafe { STDOUT.get_mut() };
     let clint = unsafe { INTERRUPT_CONTROLLER.get_mut() };
     // let orig_uart_locked = UART.is_locked();
     // unsafe { UART.force_unlock() };
 
     printk2!(
-        uart_mut,
+        stdout,
         "Interrupt epc={} tval={} cause={} hart={} status={} frame={}",
         epc,
         tval,
@@ -88,8 +88,8 @@ extern "C" fn trap_vector(
         match cause_num {
             // timer
             7 => {
-                printk2!(uart_mut, "Timer interrupt! mtime = {}", clint.mtime());
-                printk2!(uart_mut, "Rescheduling mtimecmp to 2s from now...");
+                printk2!(stdout, "Timer interrupt! mtime = {}", clint.mtime());
+                printk2!(stdout, "Rescheduling mtimecmp to 2s from now...");
                 clint.set_mtimecmp(clint.mtime() + 20_000_000);
             }
             _ => {}
@@ -98,7 +98,7 @@ extern "C" fn trap_vector(
         match cause_num {
             // page fault
             15 => {
-                printk2!(uart_mut, "Page fault... skipping to next instruction");
+                printk2!(stdout, "Page fault... skipping to next instruction");
                 return_pc += 4;
             }
             _ => {}
@@ -110,7 +110,7 @@ extern "C" fn trap_vector(
     //     core::mem::forget(UART.lock());
     // }
 
-    printk2!(uart_mut, "Returning from interrupt");
+    printk2!(stdout, "Returning from interrupt");
 
     return_pc
 }
