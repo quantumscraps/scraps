@@ -109,7 +109,7 @@ where
                     matching += 1;
                 } else {
                     matching = 0;
-                    begin_index = i;
+                    begin_index = i + 1;
                 }
                 if matching >= pages {
                     // note: ra marks this as an error but it's actually fine
