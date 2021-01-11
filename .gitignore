@@ -2,3 +2,5 @@
 /obj
 Cargo.lock
 .vscode
+*.dtb
+*.dts
