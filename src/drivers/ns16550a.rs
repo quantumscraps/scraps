@@ -127,9 +127,13 @@ impl Console for NS16550A {
         Uart::init(self)
     }
 
-    fn from_dtb(dtb: &fdt_rs::index::DevTreeIndexNode) -> Option<Self> {
+    fn from_dtb(dtb: &fdt_rs::base::DevTreeNode) -> Option<Self> {
         // Get register location and initialize from that
-        let reg = dtb.props().filter(|x| x.name() == Ok("reg")).next()?;
+        let reg = dtb
+            .props()
+            .filter(|x| Ok(x.name() == Ok("reg")))
+            .next()
+            .ok()??;
         let address = reg.u64(0).ok()?;
         let mut uart = unsafe { Self::new(address as _) };
         use core::fmt::Write;

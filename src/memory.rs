@@ -1,4 +1,4 @@
-use crate::link_var;
+use crate::{link_var, util::HeaplessResult};
 link_var!(__bss_start);
 link_var!(__bss_size);
 
@@ -14,7 +14,7 @@ const fn subdivide_size<T: Sized>(size: usize) -> usize {
 /// # Safety
 /// Safe only to be called from asm entry.
 #[no_mangle]
-pub unsafe fn setup_environment(dtb_addr: *mut u8) -> ! {
+pub unsafe fn setup_environment(dtb_addr: *mut u8) -> HeaplessResult<!> {
     // get bss section as slice
     let slice = core::slice::from_raw_parts_mut(
         &__bss_start as *const _ as *mut usize,
@@ -27,5 +27,5 @@ pub unsafe fn setup_environment(dtb_addr: *mut u8) -> ! {
     }
 
     // run kinit
-    crate::kinit(dtb_addr);
+    crate::kinit(dtb_addr)
 }

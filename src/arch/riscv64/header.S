@@ -13,7 +13,7 @@ _start:
     la gp, __global_pointer
 
     # Save DTB
-    add t5, a1, zero
+    mv t5, a1
 
     # Zero out BSS
     la a0, __bss_start
@@ -44,12 +44,14 @@ _start:
     li		t3, (1 << 3) | (1 << 7) | (1 << 11)
     csrw	mie, t3
     # restore DTB
-    add a0, t5, zero
+    mv      a1, t5
     # Return to wfi loop
     la		ra, 4f
     # perform return
     mret
 4:
+    # Inform the user something went wrong!!
+    call    print_backtrace_from_kinit
 	wfi
 	j	4b
 .option pop

@@ -89,8 +89,15 @@ where
         self.start
     }
 
+    fn assert_init(&self) {
+        if self.start == 0 {
+            panic!("allocator is uninitialized!");
+        }
+    }
+
     /// Try to allocate the contiguous region of pages, returning the pointer to the region if possible.
     pub fn try_allocate(&mut self, size: usize) -> Option<*mut u8> {
+        self.assert_init();
         let pages = size_to_pages(size);
         assert!(pages > 0, "Can't make an empty allocation");
         let mut begin_index = 0;
@@ -148,6 +155,7 @@ where
 
     /// Prints the page allocation table as a 32xN square
     pub fn print_page_allocation_table(&self) {
+        self.assert_init();
         for chunk in self.descriptors.chunks(32) {
             for descriptor in chunk {
                 if (*descriptor) & PageFlags::Free.val() != 0 {
@@ -165,6 +173,7 @@ where
 
     /// Deallocates the given region of pages.
     pub fn deallocate(&mut self, addr: *mut u8, size: usize) {
+        self.assert_init();
         let addr = addr as usize - self.start;
         let pages = size_to_pages(size);
         let begin_index = addr / PAGE_SIZE;
@@ -175,6 +184,7 @@ where
 
     /// Gets the number of used pages.
     pub fn used(&self) -> usize {
+        self.assert_init();
         self.descriptors
             .iter()
             .filter(|&&d| d & PageFlags::Taken.val() != 0)

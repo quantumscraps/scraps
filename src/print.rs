@@ -2,6 +2,7 @@
 #[macro_export]
 macro_rules! print {
 	($($args:tt)+) => ({
+			use core::fmt::Write;
 			if let Some(ref mut stdout) = *$crate::STDOUT.lock() {
 				let _ = write!(stdout, $($args)+);
 			}
@@ -49,6 +50,7 @@ macro_rules! printk {
 #[macro_export]
 macro_rules! print2 {
 	($stdout:expr, $($args:tt)+) => ({
+		use core::fmt::Write;
 		if let Some(ref mut stdout) = $stdout {
 			let _ = write!(stdout, $($args)+);
 		}

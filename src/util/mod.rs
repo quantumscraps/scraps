@@ -3,6 +3,11 @@ use core::{cell::UnsafeCell, fmt::Debug, ops::Deref};
 use spin::Mutex;
 
 //pub mod mmio;
+mod dtb;
+mod error;
+
+pub use dtb::*;
+pub use error::*;
 
 /// A Mutex wrapper that allows it
 /// (in some cases) to be borrowed without locking.
