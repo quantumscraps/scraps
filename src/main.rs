@@ -49,7 +49,7 @@ macro_rules! link_var {
         extern "C" { $visi static $name: core::ffi::c_void; }
     };
     ($($toks:tt),+) => {
-        $(link_var!($tt);)+
+        $(link_var!($toks);)+
     }
 }
 
@@ -77,6 +77,9 @@ pub extern "C" fn kinit(dtb_addr: *mut u8) -> HeaplessResult<!> {
         DevTree::new(core::slice::from_raw_parts(dtb_addr as *const _, size))?
     };
     drivers::detect_stdout(&dtb)?;
+
+    // Lets try to access some invalid memory
+    unsafe { (0 as *const usize).read_volatile() };
 
     cpu::wait_forever()
 }

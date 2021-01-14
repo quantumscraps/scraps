@@ -1,6 +1,6 @@
 use crate::{link_var, util::HeaplessResult};
 link_var!(__bss_start);
-link_var!(__bss_size);
+link_var!(__bss_end);
 
 const fn subdivide_size<T: Sized>(size: usize) -> usize {
     let t_size = core::mem::size_of::<T>();
@@ -14,11 +14,14 @@ const fn subdivide_size<T: Sized>(size: usize) -> usize {
 /// # Safety
 /// Safe only to be called from asm entry.
 #[no_mangle]
-pub unsafe fn setup_environment(dtb_addr: *mut u8) -> HeaplessResult<!> {
+#[allow(improper_ctypes_definitions)]
+pub unsafe extern "C" fn setup_environment(dtb_addr: *mut u8) -> HeaplessResult<!> {
     // get bss section as slice
     let slice = core::slice::from_raw_parts_mut(
         &__bss_start as *const _ as *mut usize,
-        subdivide_size::<usize>(&__bss_size as *const _ as usize),
+        subdivide_size::<usize>(
+            &__bss_end as *const _ as usize - &__bss_start as *const _ as usize,
+        ),
     );
 
     // zero the slice

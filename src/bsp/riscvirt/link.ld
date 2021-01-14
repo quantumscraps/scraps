@@ -29,6 +29,7 @@ SECTIONS
         PROVIDE(__bss_start = .);
         *(.sbss .sbss.*) *(.bss .bss.*)
         PROVIDE(__bss_end = .);
+        . = ALIGN(8);
     }
     PROVIDE(__stack = __bss_end + 0x80000);
     PROVIDE(__heap_start = __stack);

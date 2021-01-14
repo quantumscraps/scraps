@@ -1,6 +1,4 @@
-use crate::{printk2, STDOUT};
-
-use super::INTERRUPT_CONTROLLER;
+use crate::util::HeaplessResult;
 
 #[inline(always)]
 pub fn wait_forever() -> ! {
@@ -16,101 +14,57 @@ pub fn wait_forever() -> ! {
     }
 }
 
-// pub fn nop() {
-//     unsafe { asm!("nop") }
-// }
-
-#[repr(C)]
-#[derive(Clone)]
-pub struct TrapFrame {
-    pub regs: [usize; 32],
-    pub fregs: [f64; 32],
-    pub satp: usize,
-    pub trap_stack: *mut u8,
-    pub hartid: usize,
-}
-
-impl TrapFrame {
-    /// # Safety
-    /// Only safe if the sp points to a valid address.
-    const unsafe fn from_stack(sp: *mut u8) -> Self {
-        Self {
-            regs: [0; 32],
-            fregs: [0.; 32],
-            satp: 0,
-            trap_stack: sp,
-            hartid: 0,
-        }
-    }
-}
-
-/// This is written to mscratch to store the trap frame.
-#[allow(non_upper_case_globals)]
+/// # Safety
+/// Only safe to call from asm entry.
 #[no_mangle]
-static mut __trap_frame: TrapFrame = unsafe {
-    TrapFrame::from_stack((__trap_stack.as_mut_ptr()).add(core::mem::size_of_val(&__trap_stack)))
-};
-
-/// Stack storage. 1kb to encourage keeping trap handlers small.
-#[allow(non_upper_case_globals)]
-static mut __trap_stack: [u8; 1024] = [0; 1024];
-
-#[no_mangle]
-extern "C" fn trap_vector(
-    epc: usize,
-    tval: usize,
-    cause: usize,
-    hart: usize,
-    status: usize,
-    frame: &mut TrapFrame,
-) -> usize {
-    let is_async = cause >> 63 & 1 == 1;
-    let cause_num = cause & 0xfff;
-    let mut return_pc = epc;
-    let stdout = unsafe { STDOUT.get_mut() };
-    let clint = unsafe { INTERRUPT_CONTROLLER.get_mut() };
-    // let orig_uart_locked = UART.is_locked();
-    // unsafe { UART.force_unlock() };
-
-    printk2!(
-        stdout,
-        "Interrupt epc={} tval={} cause={} hart={} status={} frame={}",
-        epc,
-        tval,
-        cause,
-        hart,
-        status,
-        frame as *mut _ as usize
-    );
-    // panic_println!("Stuff happened");
-
-    if is_async {
-        match cause_num {
-            // timer
-            7 => {
-                printk2!(stdout, "Timer interrupt! mtime = {}", clint.mtime());
-                printk2!(stdout, "Rescheduling mtimecmp to 2s from now...");
-                clint.set_mtimecmp(clint.mtime() + 20_000_000);
-            }
-            _ => {}
-        }
-    } else {
-        match cause_num {
-            // page fault
-            15 => {
-                printk2!(stdout, "Page fault... skipping to next instruction");
-                return_pc += 4;
-            }
-            _ => {}
-        }
+pub unsafe extern "C" fn __early_entry(_: *const i8, dtb_addr: *mut u8) -> ! {
+    // Check hart
+    let hart_id: u64;
+    asm!("csrr {0}, mhartid", out(reg) hart_id);
+    if hart_id != 0 {
+        wait_forever()
     }
 
-    // Set locked state back to normal
-    // if orig_uart_locked {
-    //     core::mem::forget(UART.lock());
-    // }
+    // Enable interrupts and supervisor mode
 
-    printk2!(stdout, "Returning from interrupt");
+    //                 ~~~~~~~~~~ MPP = 1 (S-mode)
+    //                              ~~~~~~ SPIE = 1 (enable S-mode interrupts)
+    //                                       ~~~~~~ SIE = 1
+    let mstatus: u64 = 0b01 << 11 | 1 << 5 | 1 << 1;
+    asm!("csrw mstatus, {0}", in(reg) mstatus);
 
-    return_pc
+    asm!("csrw mepc, {0}", in(reg) crate::memory::setup_environment);
+
+    extern "C" {
+        fn asm_trap_vector();
+    }
+    asm!("csrw stvec, {0}", in(reg) asm_trap_vector);
+    asm!("csrw sscratch, {0}", in(reg) &mut super::trap::__trap_frame);
+
+    asm!("csrw mie, zero");
+    // all exceptions and interrupts go to S-mode
+    asm!("csrw medeleg, {0}", in(reg) u64::MAX);
+    asm!("csrw mideleg, {0}", in(reg) u64::MAX);
+
+    //             ~~~~~~ STIE = 1 (timer interrupt)
+    //                      ~~~~~~ SSIE = 1 (software interrupt)
+    let sie: u64 = 1 << 5 | 1 << 1;
+    asm!("csrw sie, {0}", in(reg) sie);
+    asm!("csrw satp, zero");
+
+    asm!("mv ra, {0}", in(reg) __early_entry_return, lateout("ra") _);
+
+    // reset dtb in proper register
+    asm!("mv a1, {0}", in(reg) dtb_addr, lateout("a1") _);
+
+    // return
+    asm!("mret", options(noreturn));
+}
+
+/// # Safety
+/// Don't call.
+#[allow(improper_ctypes_definitions)]
+unsafe extern "C" fn __early_entry_return(r: HeaplessResult<!>) -> ! {
+    crate::panic::print_backtrace_from_kinit(r);
+    wait_forever()
 }

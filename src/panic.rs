@@ -12,7 +12,7 @@ fn panic(_info: &PanicInfo) -> ! {
 
 #[no_mangle]
 #[allow(improper_ctypes_definitions)] // We only use extern "C" for calling convention
-extern "C" fn print_backtrace_from_kinit(err: HeaplessResult<!>) {
+pub extern "C" fn print_backtrace_from_kinit(err: HeaplessResult<!>) {
     let err = match err {
         Ok(_) => unreachable!(),
         Err(e) => e,
