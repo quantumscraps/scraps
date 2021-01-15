@@ -1,6 +1,6 @@
 .section .text.trap
 .global asm_trap_vector
-.option norvc # Important for vectored trap vectors
+#.option norvc # Important for vectored trap vectors
 
 asm_trap_vector:
     # Mostly taken from osblog

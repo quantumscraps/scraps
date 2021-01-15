@@ -56,6 +56,8 @@ pub trait PageTable: Sized {
     fn virt_to_phys(&self, virt_addr: usize) -> usize;
 }
 
+pub const HIGHER_HALF_BASE: usize = 0xC0000000;
+
 // Hack to make the allow work
 #[allow(non_upper_case_globals)]
 mod permissions_inner {

@@ -96,7 +96,8 @@ impl Uart for NS16550A {
         // formula for finding divisor is in the datasheet
         // Assume 22.729 MHz clock
         regs.LCR.write(LCR::DLAB::SET + LCR::WLS::EightBits);
-        let divisor = 592u16;
+        // let divisor = 592u16;
+        let divisor = 12u16;
         regs.RBR.set((divisor & 0xFF) as u8);
         regs.IER.set((divisor >> 8 & 0xff) as u8);
         // close the DLB for normal use
@@ -139,5 +140,9 @@ impl Console for NS16550A {
         use core::fmt::Write;
         let _ = core::writeln!(uart, "Initialized UART @ 0x{:x}", address);
         Some(uart)
+    }
+
+    fn base_address(&self) -> usize {
+        self.base_address
     }
 }

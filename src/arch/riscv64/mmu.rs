@@ -3,9 +3,10 @@
 use modular_bitfield::prelude::*;
 
 use crate::{
-    mmu::{PageTable, PagingSetup, Permissions},
+    link_var,
+    mmu::{PageTable, PagingSetup, Permissions, HIGHER_HALF_BASE},
     physical_page_allocator::ALLOCATOR,
-    print, printk,
+    print, printk, STDOUT,
 };
 
 // 1 << 12
@@ -52,6 +53,18 @@ pub trait SvTable: PageTable {
     /// Maps a 4KiB page by rounding the given address.
     fn map_page(&mut self, virt_addr: u64, phys_addr: u64, permissions: XWRPermissions);
 
+    /// Unmaps a 4KiB page by rounding the given address.
+    fn unmap_page(&mut self, virt_addr: u64);
+
+    /// Maps a 1GiB gigapage by rounding the given address.
+    fn unmap_gigapage(&mut self, virt_addr: u64);
+
+    /// Makes a deep clone of this page table.
+    fn deep_clone(&self, current_pt: &Self, old_base: u64, new_base: u64) -> &mut Self;
+
+    /// Deep frees this page table.
+    fn deep_free(self: &mut Self);
+
     /// Maps a range of pages using [map_page]
     /// The begin address is rounded down, and the end address is rounded up.
     fn map_page_range(
@@ -75,38 +88,41 @@ pub trait SvTable: PageTable {
         for i in 0..len {
             let virt_addr = (i + virt_offset) * page_size_u64;
             let phys_addr = (i + phys_offset) * page_size_u64;
-            printk!("Mapping {:x} -> {:x}", virt_addr, phys_addr);
+            // printk!("Mapping {:x} -> {:x}", virt_addr, phys_addr);
             self.map_page(virt_addr, phys_addr, permissions);
+        }
+    }
+
+    /// Unmaps a range of pages using [map_page]
+    /// Same behavior as [map_page_range].
+    fn unmap_page_range(&mut self, virt_addr_begin: u64, virt_addr_end: u64) {
+        let page_size_u64 = PAGE_SIZE as u64;
+        let virt_offset = virt_addr_begin / page_size_u64;
+        // let phys_offset = phys_addr_begin / page_size_u64;
+        let virt_addr_begin = virt_addr_begin & !(page_size_u64 - 1);
+        let virt_addr_end = if virt_addr_end % page_size_u64 > 0 {
+            ((virt_addr_end) & !(page_size_u64 - 1)) + page_size_u64
+        } else {
+            virt_addr_end
+        };
+        let len = (virt_addr_end - virt_addr_begin) / page_size_u64;
+        printk!("Unmapping {} pages", len);
+        for i in 0..len {
+            let virt_addr = (i + virt_offset) * page_size_u64;
+            // let phys_addr = (i + phys_offset) * page_size_u64;
+            // printk!("Unmapping {:x}", virt_addr);
+            self.unmap_page(virt_addr);
         }
     }
 
     /// Maps a paging setup.
     fn map_page_setup(&mut self, setup: &PagingSetup) {
         for (&virt_base, &(start, end, permissions)) in setup.mappings().iter() {
-            let permissions_converted = {
-                let mut p = XWRPermissions::empty();
-                if permissions.contains(Permissions::Read) {
-                    p |= XWRPermissions::Read;
-                }
-                if permissions.contains(Permissions::Write) {
-                    p |= XWRPermissions::Write;
-                }
-                if permissions.contains(Permissions::Execute) {
-                    p |= XWRPermissions::Execute;
-                }
-                if p.is_empty() {
-                    // Unreachable since an empty Permissions cannot be
-                    // inserted into a PagingSetup
-                    unreachable!()
-                } else {
-                    p
-                }
-            };
             self.map_page_range(
                 virt_base as u64,
                 (end - start + virt_base) as u64,
                 start as u64,
-                permissions_converted,
+                permissions.into(),
             );
         }
     }
@@ -324,18 +340,29 @@ impl SvTable for Sv39Table {
             .with_permissions(permissions);
     }
 
+    fn unmap_gigapage(&mut self, virt_addr: u64) {
+        // let virt_addr = virt_addr & !(onegig - 1);
+        // round the address down
+        let index = virt_addr / ONEGIG;
+        printk!("Unmapping root index {}", index);
+        // mask out 1g of phys_addr
+        // let phys_addr2 = phys_addr & !(ONEGIG - 1);
+        // set flags to vgrwx for now
+        self.entries[index as usize].set_valid(false);
+    }
+
     /// maps a 4k page by rounding the given addr
     fn map_page(&mut self, virt_addr: u64, phys_addr: u64, permissions: XWRPermissions) {
         // mask out page_size of phys_addr
         let phys_addr2 = phys_addr & !(PAGE_SIZE as u64 - 1);
         // split virt addr
         let (vpn2, vpn1, vpn0) = split_virt_addr_sv39(virt_addr);
-        printk!(
-            "root index = {}, level1 index = {}, level2 index = {}",
-            vpn2,
-            vpn1,
-            vpn0
-        );
+        // printk!(
+        //     "root index = {}, level1 index = {}, level2 index = {}",
+        //     vpn2,
+        //     vpn1,
+        //     vpn0
+        // );
         let root_entry = &mut self.entries[vpn2 as usize];
         // if invalid, allocate page
         // otherwise, use new pointer
@@ -379,6 +406,39 @@ impl SvTable for Sv39Table {
             .with_valid(true)
             .with_global(true)
             .with_permissions(permissions);
+    }
+
+    /// maps a 4k page by rounding the given addr
+    fn unmap_page(&mut self, virt_addr: u64) {
+        // mask out page_size of phys_addr
+        // let phys_addr2 = phys_addr & !(PAGE_SIZE as u64 - 1);
+        // split virt addr
+        let (vpn2, vpn1, vpn0) = split_virt_addr_sv39(virt_addr);
+        // printk!(
+        //     "root index = {}, level1 index = {}, level2 index = {}",
+        //     vpn2,
+        //     vpn1,
+        //     vpn0
+        // );
+        let root_entry = &mut self.entries[vpn2 as usize];
+        // if invalid, allocate page
+        // otherwise, use new pointer
+        let level1_table = if root_entry.valid() {
+            unsafe { &mut *(root_entry.physical_addr() as *mut Self) }
+        } else {
+            return;
+        };
+        // same thing for level2
+        let level1_entry = &mut level1_table.entries[vpn1 as usize];
+        let level2_table = if level1_entry.valid() {
+            unsafe { &mut *(level1_entry.physical_addr() as *mut Self) }
+        } else {
+            return;
+        };
+        let level2_entry = &mut level2_table.entries[vpn0 as usize];
+        // set leaf
+        // just set invalid
+        level2_entry.set_valid(false);
     }
 
     fn virt_to_phys(&self, virt_addr: u64) -> u64 {
@@ -426,6 +486,103 @@ impl SvTable for Sv39Table {
 
     fn entries(&self) -> &[Self::PTE] {
         &self.entries
+    }
+
+    fn deep_clone(&self, current_pt: &Self, old_base: u64, new_base: u64) -> &mut Self {
+        let root_clone = unsafe {
+            Self::cast_page_table(
+                ALLOCATOR
+                    .try_zallocate(PAGE_SIZE)
+                    .expect("Failed to allocate page")
+                    .offset((new_base - old_base) as _),
+            )
+        };
+        root_clone.entries = self.entries;
+        for level1_entry in root_clone.entries.iter_mut() {
+            if level1_entry.permissions() == XWRPermissions::Pointer {
+                // Clone this level
+                let level1_clone = unsafe {
+                    Self::cast_page_table(
+                        ALLOCATOR
+                            .try_zallocate(PAGE_SIZE)
+                            .expect("Failed to allocate page")
+                            .offset((new_base - old_base) as _),
+                    )
+                };
+                let old_level1 =
+                    unsafe { Self::cast_page_table(level1_entry.physical_addr() as _) };
+                level1_clone.entries = old_level1.entries;
+
+                for level2_entry in level1_clone.entries.iter_mut() {
+                    if level2_entry.permissions() == XWRPermissions::Pointer {
+                        // clone this level
+                        let level2_clone = unsafe {
+                            Self::cast_page_table(
+                                ALLOCATOR
+                                    .try_zallocate(PAGE_SIZE)
+                                    .expect("Failed to allocate page")
+                                    .offset((new_base - old_base) as _),
+                            )
+                        };
+                        let old_level2 =
+                            unsafe { Self::cast_page_table(level2_entry.physical_addr() as _) };
+                        level2_clone.entries = old_level2.entries;
+
+                        // Level 3 is always leaf, no need to iterate
+
+                        // Set new addr
+                        // Set new addr
+                        *level2_entry = Sv39PTE::from_physical_addr(SvTable::virt_to_phys(
+                            current_pt,
+                            level2_clone as *mut _ as u64,
+                        ))
+                        .with_valid(level2_entry.valid())
+                        .with_global(level2_entry.global())
+                        .with_permissions(level2_entry.permissions());
+                    }
+                }
+
+                // Set new addr
+                *level1_entry = Sv39PTE::from_physical_addr(SvTable::virt_to_phys(
+                    current_pt,
+                    level1_clone as *mut _ as u64,
+                ))
+                .with_valid(level1_entry.valid())
+                .with_global(level1_entry.global())
+                .with_permissions(level1_entry.permissions());
+            }
+        }
+
+        root_clone
+    }
+
+    fn deep_free(self: &mut Self) {
+        for level1_entry in &self.entries {
+            if level1_entry.permissions() == XWRPermissions::Pointer {
+                // Free inner entries first
+                let level1_table =
+                    unsafe { Self::cast_page_table(level1_entry.physical_addr() as _) };
+
+                for level2_entry in &level1_table.entries {
+                    if level2_entry.permissions() == XWRPermissions::Pointer {
+                        // Free this table, level3 is always leaf
+                        unsafe { &mut ALLOCATOR }.deallocate(
+                            level2_entry.physical_addr() as _,
+                            core::mem::size_of::<Self>(),
+                        );
+                    }
+                }
+
+                // Free level1 table
+                unsafe { &mut ALLOCATOR }.deallocate(
+                    level1_entry.physical_addr() as _,
+                    core::mem::size_of::<Self>(),
+                );
+            }
+        }
+
+        // Free ourself
+        unsafe { &mut ALLOCATOR }.deallocate(self as *mut _ as _, core::mem::size_of::<Self>());
     }
 }
 
@@ -486,8 +643,36 @@ pub unsafe fn enable_paging<PageSystem: Sv + ?Sized>(table: &PageSystem::Table) 
     // }
 }
 
+pub unsafe fn enable_paging2<PageSystem: Sv + ?Sized>(phys_addr: usize) {
+    let addr = phys_addr;
+    if addr % PAGE_SIZE != 0 {
+        panic!("Table is not page-aligned");
+    }
+    let mode = PageSystem::MODE as u64;
+    let ppn = (addr / PAGE_SIZE) as u64;
+    printk!(
+        "ppn = 0x{:x}, ppn << 12 = 0x{:x}, addr = 0x{:x}",
+        ppn,
+        ppn << 12,
+        addr
+    );
+    // bottom 44 bits of ppn
+    let satp_value = (mode << 60) | (ppn & ((1 << 44) - 1));
+    // unsafe {
+    printk!("Setting satp to 0b{:064b}..", satp_value);
+    // set satp
+    asm!(
+        "csrw satp, {0}",
+        in(reg) satp_value,
+    );
+    printk!("set satp, going to sfence.vma now");
+    asm!("sfence.vma");
+    // }
+}
+
 #[allow(non_upper_case_globals)]
 mod permissions_inner {
+    use super::Permissions;
     use modular_bitfield::{error::*, Specifier};
 
     bitflags::bitflags! {
@@ -512,8 +697,132 @@ mod permissions_inner {
             Self::from_bits(bytes).ok_or(InvalidBitPattern::new(bytes))
         }
     }
+
+    impl From<Permissions> for XWRPermissions {
+        fn from(permissions: Permissions) -> Self {
+            let mut p = XWRPermissions::empty();
+            if permissions.contains(Permissions::Read) {
+                p |= XWRPermissions::Read;
+            }
+            if permissions.contains(Permissions::Write) {
+                p |= XWRPermissions::Write;
+            }
+            if permissions.contains(Permissions::Execute) {
+                p |= XWRPermissions::Execute;
+            }
+            if p.is_empty() {
+                // Unreachable since an empty Permissions cannot be
+                // inserted into a PagingSetup
+                unreachable!()
+            } else {
+                p
+            }
+        }
+    }
 }
 pub use permissions_inner::XWRPermissions;
 
+use super::trap::TrapFrame;
+
 #[inline(never)]
-pub const unsafe fn init() {}
+pub unsafe extern "C" fn init() {
+    let ra: u64;
+    asm!("mv {0}, ra", out(reg) ra);
+    // Create a page table with kernel mapped to higher half, and STDOUT identity mapped
+    let page_table_ptr = ALLOCATOR
+        .try_zallocate(PAGE_SIZE)
+        .expect("Failed to allocate page");
+    let page_table = Sv39Table::cast_page_table(page_table_ptr);
+    // map in kernel
+    link_var!(__kern_start, __kern_end);
+    let kern_start = &__kern_start as *const _ as u64;
+    let kern_end = &__kern_end as *const _ as u64;
+    // identity map until we disable it later
+    page_table.map_gigapage(kern_start, kern_start, Permissions::RWX.into());
+    page_table.map_gigapage(HIGHER_HALF_BASE as _, kern_start, Permissions::RWX.into());
+    // page_table.map_page_range(kern_start, kern_end, kern_start, Permissions::RWX.into());
+    // page_table.map_page_range(
+    //     HIGHER_HALF_BASE as _,
+    //     kern_end - kern_start + (HIGHER_HALF_BASE as u64),
+    //     kern_start,
+    //     Permissions::RWX.into(),
+    // );
+    // map in stdout
+    use crate::driver_interfaces::Console;
+    if let Some(ref stdout) = *STDOUT.get_mut() {
+        let base = stdout.base_address();
+        page_table.map_page(base as _, base as _, Permissions::RW.into());
+    }
+    page_table.enable();
+    // test if paging worked
+    let ptest = *(((&crate::PAGING_TEST as *const _ as usize) - (kern_start as usize)
+        + HIGHER_HALF_BASE) as *const usize);
+    printk!("PAGING_TEST from higher half: {:x}", ptest);
+    // enable page table and jump to higher half
+    let jump_to = (higher_half_mmu_cont as u64) - kern_start + (HIGHER_HALF_BASE as u64);
+    printk!("Jumping to {:x}", jump_to);
+    // setup stack and gp too
+    let gp: u64;
+    let sp: u64;
+    // let ra: u64;
+    asm!("mv {0}, gp", out(reg) gp);
+    asm!("mv {0}, sp", out(reg) sp);
+    // asm!("mv {0}, ra", out(reg) ra);
+    asm!("mv gp, {0}", in(reg) gp - kern_start + (HIGHER_HALF_BASE as u64));
+    asm!("mv sp, {0}", in(reg) sp - kern_start + (HIGHER_HALF_BASE as u64));
+    asm!("mv t5, {0}", in(reg) ra - kern_start + (HIGHER_HALF_BASE as u64), lateout("t5") _);
+    // printk!("New ra = {:x}", ra - kern_start + (HIGHER_HALF_BASE as u64));
+    let f = core::mem::transmute::<_, unsafe extern "C" fn(u64, u64)>(jump_to);
+    asm!("jalr {0}", in(reg) f, in("a0") kern_start, in("a1") kern_end);
+    // f(kern_start, kern_end);
+}
+
+unsafe extern "C" fn higher_half_mmu_cont(old_kern_start: u64, old_kern_end: u64) {
+    // asm!("sub ra, ra, {0}", "add ra, ra, {1}", in(reg) old_kern_start, in(reg) HIGHER_HALF_BASE, lateout("ra") _);
+    // Reserve t5
+    asm!("", lateout("t5") _);
+    let satp: u64;
+    asm!("csrr {0}, satp", out(reg) satp);
+    // Fix stvec before enabling new table
+    let stvec: u64;
+    asm!("csrr {0}, stvec", out(reg) stvec);
+    asm!("csrw stvec, {0}", in(reg) stvec - old_kern_start + (HIGHER_HALF_BASE as u64));
+    // Fix sscratch
+    let sscratch: u64;
+    asm!("csrr {0}, sscratch", out(reg) sscratch);
+    let new_sscratch = sscratch - old_kern_start + (HIGHER_HALF_BASE as u64);
+    asm!("csrw sscratch, {0}", in(reg) new_sscratch);
+    // Fix trap stack!
+    let trap_frame = &mut *(new_sscratch as *mut TrapFrame);
+    trap_frame.trap_stack = trap_frame
+        .trap_stack
+        .offset(((HIGHER_HALF_BASE as u64) - old_kern_start) as _);
+    // (0 as *const usize).read_volatile();
+    let page_table_ptr = ((satp & ((1 << 44) - 1)) * (PAGE_SIZE as u64)) - old_kern_start
+        + (HIGHER_HALF_BASE as u64);
+    let page_table = Sv39Table::cast_page_table(page_table_ptr as _);
+    // Create a copy!
+    printk!("Value of stack satp = {:x}", &satp as *const _ as usize);
+    printk!("Value of page_table_ptr = {:x}", page_table_ptr);
+    // let new_page_table =
+    //     page_table.deep_clone(&page_table, old_kern_start, HIGHER_HALF_BASE as u64);
+    // Unmap identity kernel
+    // link_var!(__kern_start, __kern_end);
+    // let kern_start = &__kern_start as *const _ as u64;
+    // let kern_end = &__kern_end as *const _ as u64;
+    page_table.unmap_gigapage(old_kern_start);
+    // switch to new page table
+    // let new_phys_addr = PageTable::virt_to_phys(page_table, &new_page_table as *const _ as usize);
+    // printk!("New phys addr = {:x}", new_phys_addr);
+    // enable_paging2::<Sv39>(new_phys_addr);
+    printk!("It worked!");
+    // Free old table
+    // page_table.deep_free();
+    // // done! free old page table
+    // ALLOCATOR.deallocate(
+    //     page_table as *mut _ as *mut u8,
+    //     core::mem::size_of::<Sv39Table>(),
+    // );
+    // return to old address
+    asm!("jalr t5");
+}

@@ -29,6 +29,9 @@ pub trait Console: Write + Debug {
     fn from_dtb(dtb: &DevTreeNode) -> Option<Self>
     where
         Self: Sized;
+
+    /// Gets the base address of this console.
+    fn base_address(&self) -> usize;
 }
 
 #[derive(Debug, Clone)]
@@ -41,6 +44,15 @@ pub enum UartConsole {
 }
 
 impl UartConsole {
+    fn console(&self) -> &dyn Console {
+        match self {
+            #[cfg(feature = "bsp_riscvirt")]
+            Self::NS16550A(ref uart) => uart,
+            #[cfg(feature = "bsp_raspi64")]
+            Self::PL011(ref uart) => uart,
+        }
+    }
+
     fn console_mut(&mut self) -> &mut dyn Console {
         match self {
             #[cfg(feature = "bsp_riscvirt")]
@@ -80,5 +92,9 @@ impl Console for UartConsole {
             "pl011" => PL011::from_dtb(dtb).map(Self::PL011),
             _ => None,
         }
+    }
+
+    fn base_address(&self) -> usize {
+        self.console().base_address()
     }
 }

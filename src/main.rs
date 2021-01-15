@@ -4,6 +4,7 @@
 #![feature(const_fn)]
 #![feature(const_generics)]
 #![feature(const_evaluatable_checked)] // NOTE: const_evaluatable_unchecked isn't a thing !!
+#![feature(const_in_array_repeat_expressions)]
 #![feature(const_panic)]
 #![feature(const_ptr_offset)]
 #![feature(const_size_of_val)]
@@ -35,11 +36,14 @@ mod mmu;
 mod panic;
 mod physical_page_allocator;
 mod print;
+mod process;
 mod time;
 mod util;
 
 use driver_interfaces::UartConsole;
 use fdt_rs::base::DevTree;
+use physical_page_allocator::ALLOCATOR;
+use process::Process;
 use util::{HeaplessResult, UnsafeMutex};
 
 /// Creates a static ref to a linker variable
@@ -59,6 +63,9 @@ const PAGING_TEST: usize = 0x1010101010101010;
 /// Default output device
 static STDOUT: UnsafeMutex<Option<UartConsole>> = UnsafeMutex::new(None);
 
+/// Processes!
+static PROCESSES: UnsafeMutex<[Option<Process>; 4]> = UnsafeMutex::new([None; 4]);
+
 /// The early entry point for initializing the OS.
 /// Paging, DTB, etc. are setup here.
 ///
@@ -77,6 +84,17 @@ pub extern "C" fn kinit(dtb_addr: *mut u8) -> HeaplessResult<!> {
         DevTree::new(core::slice::from_raw_parts(dtb_addr as *const _, size))?
     };
     drivers::detect_stdout(&dtb)?;
+
+    unsafe {
+        // setup allocator
+        ALLOCATOR.default_init();
+        // setup mmu
+        arch::mmu::init();
+    };
+
+    printk!("Initialized ppa and mmu");
+
+    printk!("Stack is broken, right?");
 
     // Lets try to access some invalid memory
     unsafe { (0 as *const usize).read_volatile() };

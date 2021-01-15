@@ -1,12 +1,12 @@
 use crate::{printk2, STDOUT};
 
-use super::INTERRUPT_CONTROLLER;
+use super::{default_fregs, default_regs, Fregs, Regs, INTERRUPT_CONTROLLER};
 
 #[repr(C)]
 #[derive(Clone)]
 pub struct TrapFrame {
-    pub regs: [usize; 32],
-    pub fregs: [f64; 32],
+    pub regs: Regs,
+    pub fregs: Fregs,
     pub satp: usize,
     pub trap_stack: *mut u8,
     pub hartid: usize,
@@ -17,8 +17,8 @@ impl TrapFrame {
     /// Only safe if the sp points to a valid address.
     const unsafe fn from_stack(sp: *mut u8) -> Self {
         Self {
-            regs: [0; 32],
-            fregs: [0.; 32],
+            regs: default_regs(),
+            fregs: default_fregs(),
             satp: 0,
             trap_stack: sp,
             hartid: 0,
@@ -56,7 +56,7 @@ extern "C" fn trap_vector(
 
     printk2!(
         stdout,
-        "Interrupt epc={} tval={} cause={} hart={} status={} frame={}",
+        "Interrupt epc=0x{:x} tval=0x{:x} cause={} hart={} status={} frame=0x{:x}",
         epc,
         tval,
         cause,
@@ -79,7 +79,16 @@ extern "C" fn trap_vector(
     } else {
         match cause_num {
             // page fault
-            5 | 15 => {
+            5 | 13 | 15 => {
+                let instruction = unsafe { core::slice::from_raw_parts(epc as *const u8, 4) };
+                printk2!(
+                    stdout,
+                    "Instruction as hex: {:02x} {:02x} {:02x} {:02x}",
+                    instruction[0],
+                    instruction[1],
+                    instruction[2],
+                    instruction[3]
+                );
                 printk2!(stdout, "Page fault... skipping to next instruction");
                 return_pc += 4;
             }
