@@ -289,6 +289,14 @@ pub struct Sv39Table {
     entries: [<Self as SvTable>::PTE; Self::ENTRIES],
 }
 
+impl Sv39Table {
+    const fn new() -> Self {
+        Self {
+            entries: [Sv39PTE::new(); Self::ENTRIES],
+        }
+    }
+}
+
 impl<T: SvTable<Sv = U>, U: Sv<Table = T>> PageTable for T {
     fn print(&self) {
         SvTable::print(self);
@@ -723,6 +731,14 @@ mod permissions_inner {
 pub use permissions_inner::XWRPermissions;
 
 use super::trap::TrapFrame;
+
+/// Root page table, for initial higher half boot.
+/// Put in its own section so it is guaranteed to be in the
+/// first 1GiB of the kernel.
+#[link_section = ".data.rpt"] // rpt = root page table
+#[no_mangle]
+#[allow(non_upper_case_globals)]
+pub static mut __root_page_table: Sv39Table = Sv39Table::new();
 
 #[inline(never)]
 pub unsafe extern "C" fn init() {

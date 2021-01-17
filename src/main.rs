@@ -40,6 +40,7 @@ mod process;
 mod time;
 mod util;
 
+use arch::mmu::{SvTable, __root_page_table};
 use driver_interfaces::UartConsole;
 use fdt_rs::base::DevTree;
 use physical_page_allocator::ALLOCATOR;
@@ -75,7 +76,13 @@ static PROCESSES: UnsafeMutex<[Option<Process>; 4]> = UnsafeMutex::new([None; 4]
 /// [setup_environment]: memory::setup_environment
 #[no_mangle]
 #[allow(improper_ctypes_definitions)] // We only use extern "C" for calling convention
-pub extern "C" fn kinit(dtb_addr: *mut u8) -> HeaplessResult<!> {
+pub extern "C" fn kinit(dtb_addr: *mut u8, old_kern_start: u64) -> HeaplessResult<!> {
+    // unmap old kernel base
+    unsafe {
+        __root_page_table.unmap_gigapage(old_kern_start);
+        asm!("sfence.vma");
+    }
+
     let dtb = unsafe {
         let size = DevTree::read_totalsize(core::slice::from_raw_parts(
             dtb_addr as *const _,
@@ -89,7 +96,7 @@ pub extern "C" fn kinit(dtb_addr: *mut u8) -> HeaplessResult<!> {
         // setup allocator
         ALLOCATOR.default_init();
         // setup mmu
-        arch::mmu::init();
+        // arch::mmu::init();
     };
 
     printk!("Initialized ppa and mmu");

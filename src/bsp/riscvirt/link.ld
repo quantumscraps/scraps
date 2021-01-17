@@ -6,6 +6,7 @@ SECTIONS
     PROVIDE(__kern_start = .);
     .text : {
         PROVIDE(__text_start = .);
+        /* HACK: Apparently QEMU disregards ENTRY and just jumps to 0x80000000, so we have to put rpt at the end */
         *(.text.init)
         . = ALIGN(4);
         *(.text.trap)
@@ -21,7 +22,7 @@ SECTIONS
     .data : {
         . = ALIGN(4096);
         PROVIDE(__data_start = .);
-        *(.sdata .sdata.*) *(.data .data.*)
+        *(.sdata .sdata.*) *(.data)
         PROVIDE(__data_end = .);
     }
     .bss : {
@@ -33,5 +34,10 @@ SECTIONS
     }
     PROVIDE(__stack = __bss_end + 0x80000);
     PROVIDE(__heap_start = __stack);
-    PROVIDE(__kern_end = __heap_start + 0x100000);
+    . = __heap_start + 0x100000;
+    . = ALIGN(4096);
+    .data.rpt : {
+        *(.data.rpt)
+    }
+    PROVIDE(__kern_end = .);
 }
