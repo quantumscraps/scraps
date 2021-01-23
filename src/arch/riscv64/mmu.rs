@@ -4,7 +4,7 @@ use modular_bitfield::prelude::*;
 
 use crate::{
     link_var,
-    mmu::{PageTable, PagingSetup, Permissions, HIGHER_HALF_BASE},
+    mmu::{PageTable, Permissions, HIGHER_HALF_BASE},
     physical_page_allocator::ALLOCATOR,
     print, printk, STDOUT,
 };
@@ -110,18 +110,6 @@ pub trait SvTable: PageTable {
             // let phys_addr = (i + phys_offset) * page_size_u64;
             // printk!("Unmapping {:x}", virt_addr);
             self.unmap_page(virt_addr);
-        }
-    }
-
-    /// Maps a paging setup.
-    fn map_page_setup(&mut self, setup: &PagingSetup) {
-        for (&virt_base, &(start, end, permissions)) in setup.mappings().iter() {
-            self.map_page_range(
-                virt_base,
-                end - start + virt_base,
-                start,
-                permissions.into(),
-            );
         }
     }
 
@@ -306,24 +294,6 @@ impl<T: SvTable<Sv = U>, U: Sv<Table = T>> PageTable for T {
 
     fn virt_to_phys(&self, virt_addr: usize) -> usize {
         SvTable::virt_to_phys(self, virt_addr as _) as _
-    }
-
-    fn from_page_setup<'a, 'b>(setup: &'a PagingSetup) -> &'b mut Self {
-        // Create a root table
-        let root_table_addr = unsafe { &mut ALLOCATOR }
-            .try_zallocate(PAGE_SIZE)
-            .expect("Couldn't allocate page!");
-        printk!("Root table addr = {}", root_table_addr as usize);
-        printk!(
-            "root_addr % PAGE_SIZE = {}",
-            root_table_addr as usize % PAGE_SIZE
-        );
-        let root_table = unsafe { T::cast_page_table(root_table_addr) };
-
-        // Mapping with Sv39
-        root_table.map_page_setup(setup);
-
-        root_table
     }
 }
 
@@ -750,7 +720,6 @@ pub unsafe extern "C" fn init() {
     // map in kernel
     link_var!(__kern_start, __kern_end);
     let kern_start = &__kern_start as *const _ as usize;
-    let kern_end = &__kern_end as *const _ as usize;
     // identity map until we disable it later
     page_table.map_gigapage(kern_start, kern_start, Permissions::RWX.into());
     page_table.map_gigapage(HIGHER_HALF_BASE as _, kern_start, Permissions::RWX.into());
@@ -787,11 +756,11 @@ pub unsafe extern "C" fn init() {
     asm!("mv t5, {0}", in(reg) ra - kern_start + HIGHER_HALF_BASE, lateout("t5") _);
     // printk!("New ra = {:x}", ra - kern_start + (HIGHER_HALF_BASE as u64));
     let f = core::mem::transmute::<_, unsafe extern "C" fn(u64, u64)>(jump_to);
-    asm!("jalr {0}", in(reg) f, in("a0") kern_start, in("a1") kern_end);
+    asm!("jalr {0}", in(reg) f, in("a0") kern_start);
     // f(kern_start, kern_end);
 }
 
-unsafe extern "C" fn higher_half_mmu_cont(old_kern_start: usize, old_kern_end: usize) {
+unsafe extern "C" fn higher_half_mmu_cont(old_kern_start: usize) {
     // asm!("sub ra, ra, {0}", "add ra, ra, {1}", in(reg) old_kern_start, in(reg) HIGHER_HALF_BASE, lateout("ra") _);
     // Reserve t5
     asm!("", lateout("t5") _);

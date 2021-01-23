@@ -42,11 +42,8 @@ mod util;
 
 use arch::mmu::{SvTable, XWRPermissions, __root_page_table};
 use driver_interfaces::{Console, UartConsole};
-use drivers::known_good_uart;
-use mmu::Permissions;
-use physical_page_allocator::ALLOCATOR;
 use process::Process;
-use util::{HeaplessResult, UnsafeMutex};
+use util::UnsafeMutex;
 
 /// Creates a static ref to a linker variable
 #[macro_export]

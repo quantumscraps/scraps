@@ -1,9 +1,4 @@
-use crate::{
-    arch::mmu::{SvTable, __root_page_table},
-    link_var,
-    mmu::HIGHER_HALF_BASE,
-    util::HeaplessResult,
-};
+use crate::{link_var, mmu::HIGHER_HALF_BASE};
 link_var!(__bss_start);
 link_var!(__bss_end);
 
