@@ -74,7 +74,7 @@ pub unsafe extern "C" fn __early_entry(_: *const i8, dtb_addr: *mut u8) -> ! {
     // return
     asm!(
         "mret",
-        in("ra") (wait_forever as usize) - (kern_start as usize) + HIGHER_HALF_BASE,
+        in("ra") (wait_forever as usize) - kern_start + HIGHER_HALF_BASE,
         in("a0") dtb_addr,
         in("a1") kern_start,
         options(noreturn),
