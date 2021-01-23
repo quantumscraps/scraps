@@ -709,20 +709,20 @@ use super::trap::TrapFrame;
 pub static mut __root_page_table: Sv39Table = Sv39Table::new();
 
 #[inline(never)]
-pub unsafe extern "C" fn init() {
-    let ra: usize;
-    asm!("mv {0}, ra", out(reg) ra);
+pub unsafe extern "C" fn init(return_to: usize, ra: usize, a0: usize, a1: usize) -> ! {
+    // let ra: usize;
+    // asm!("mv {0}, ra", out(reg) ra);
     // Create a page table with kernel mapped to higher half, and STDOUT identity mapped
-    let page_table_ptr = ALLOCATOR
-        .try_zallocate(PAGE_SIZE)
-        .expect("Failed to allocate page");
-    let page_table = Sv39Table::cast_page_table(page_table_ptr);
+    // let page_table_ptr = ALLOCATOR
+    //     .try_zallocate(PAGE_SIZE)
+    //     .expect("Failed to allocate page");
+    // let page_table = Sv39Table::cast_page_table(page_table_ptr);
     // map in kernel
     link_var!(__kern_start, __kern_end);
     let kern_start = &__kern_start as *const _ as usize;
     // identity map until we disable it later
-    page_table.map_gigapage(kern_start, kern_start, Permissions::RWX.into());
-    page_table.map_gigapage(HIGHER_HALF_BASE as _, kern_start, Permissions::RWX.into());
+    __root_page_table.map_gigapage(kern_start, kern_start, Permissions::RWX.into());
+    __root_page_table.map_gigapage(HIGHER_HALF_BASE as _, kern_start, Permissions::RWX.into());
     // page_table.map_page_range(kern_start, kern_end, kern_start, Permissions::RWX.into());
     // page_table.map_page_range(
     //     HIGHER_HALF_BASE as _,
@@ -734,12 +734,13 @@ pub unsafe extern "C" fn init() {
     use crate::driver_interfaces::Console;
     if let Some(ref stdout) = *STDOUT.get_mut() {
         let base = stdout.base_address();
-        page_table.map_page(base as _, base as _, Permissions::RW.into());
+        // map gigapage since no alloc setup yet
+        __root_page_table.map_gigapage(base as _, base as _, Permissions::RW.into());
     }
-    page_table.enable();
+    __root_page_table.enable();
     // test if paging worked
-    let ptest = *(((&crate::PAGING_TEST as *const _ as usize) - (kern_start as usize)
-        + HIGHER_HALF_BASE) as *const usize);
+    let ptest = *(((&crate::PAGING_TEST as *const _ as usize) - kern_start + HIGHER_HALF_BASE)
+        as *const usize);
     printk!("PAGING_TEST from higher half: {:x}", ptest);
     // enable page table and jump to higher half
     let jump_to = (higher_half_mmu_cont as usize) - kern_start + HIGHER_HALF_BASE;
@@ -753,19 +754,26 @@ pub unsafe extern "C" fn init() {
     // asm!("mv {0}, ra", out(reg) ra);
     asm!("mv gp, {0}", in(reg) gp - kern_start + HIGHER_HALF_BASE);
     asm!("mv sp, {0}", in(reg) sp - kern_start + HIGHER_HALF_BASE);
-    asm!("mv t5, {0}", in(reg) ra - kern_start + HIGHER_HALF_BASE, lateout("t5") _);
+    // asm!("mv t5, {0}", in(reg) ra - kern_start + HIGHER_HALF_BASE, lateout("t5") _);
     // printk!("New ra = {:x}", ra - kern_start + (HIGHER_HALF_BASE as u64));
-    let f = core::mem::transmute::<_, unsafe extern "C" fn(u64, u64)>(jump_to);
-    asm!("jalr {0}", in(reg) f, in("a0") kern_start);
+    let f = core::mem::transmute::<_, unsafe extern "C" fn(usize, usize)>(jump_to);
+    asm!("jalr {0}", in(reg) f, in("a0") kern_start, in("a1") return_to, in("a2") ra, in("a3") a0, in("a4") a1, options(noreturn));
     // f(kern_start, kern_end);
 }
 
-unsafe extern "C" fn higher_half_mmu_cont(old_kern_start: usize) {
+unsafe extern "C" fn higher_half_mmu_cont(
+    old_kern_start: usize,
+    jump_to: usize,
+    ra: usize,
+    a0: usize,
+    a1: usize,
+) -> ! {
     // asm!("sub ra, ra, {0}", "add ra, ra, {1}", in(reg) old_kern_start, in(reg) HIGHER_HALF_BASE, lateout("ra") _);
     // Reserve t5
-    asm!("", lateout("t5") _);
-    let satp: usize;
-    asm!("csrr {0}, satp", out(reg) satp);
+    // asm!("", lateout("t5") _);
+    printk!("Made it to higher half");
+    // let satp: usize;
+    // asm!("csrr {0}, satp", out(reg) satp);
     // Fix stvec before enabling new table
     let stvec: usize;
     asm!("csrr {0}, stvec", out(reg) stvec);
@@ -774,6 +782,7 @@ unsafe extern "C" fn higher_half_mmu_cont(old_kern_start: usize) {
     let sscratch: usize;
     asm!("csrr {0}, sscratch", out(reg) sscratch);
     let new_sscratch = sscratch - old_kern_start + HIGHER_HALF_BASE;
+    printk!("New sscratch = {:x}", new_sscratch);
     asm!("csrw sscratch, {0}", in(reg) new_sscratch);
     // Fix trap stack!
     let trap_frame = &mut *(new_sscratch as *mut TrapFrame);
@@ -781,18 +790,19 @@ unsafe extern "C" fn higher_half_mmu_cont(old_kern_start: usize) {
         .trap_stack
         .offset((HIGHER_HALF_BASE - old_kern_start) as _);
     // (0 as *const usize).read_volatile();
-    let page_table_ptr = ((satp & ((1 << 44) - 1)) * PAGE_SIZE) - old_kern_start + HIGHER_HALF_BASE;
-    let page_table = Sv39Table::cast_page_table(page_table_ptr as _);
+    // let page_table_ptr = ((satp & ((1 << 44) - 1)) * PAGE_SIZE) - old_kern_start + HIGHER_HALF_BASE;
+    // let page_table = Sv39Table::cast_page_table(page_table_ptr as _);
     // Create a copy!
-    printk!("Value of stack satp = {:x}", &satp as *const _ as usize);
-    printk!("Value of page_table_ptr = {:x}", page_table_ptr);
+    // printk!("Value of stack satp = {:x}", &satp as *const _ as usize);
+    // printk!("Value of page_table_ptr = {:x}", page_table_ptr);
     // let new_page_table =
     //     page_table.deep_clone(&page_table, old_kern_start, HIGHER_HALF_BASE as u64);
     // Unmap identity kernel
     // link_var!(__kern_start, __kern_end);
     // let kern_start = &__kern_start as *const _ as u64;
     // let kern_end = &__kern_end as *const _ as u64;
-    page_table.unmap_gigapage(old_kern_start);
+    printk!("Gonna unmap old kern gigapage");
+    __root_page_table.unmap_gigapage(old_kern_start);
     // switch to new page table
     // let new_phys_addr = PageTable::virt_to_phys(page_table, &new_page_table as *const _ as usize);
     // printk!("New phys addr = {:x}", new_phys_addr);
@@ -806,5 +816,7 @@ unsafe extern "C" fn higher_half_mmu_cont(old_kern_start: usize) {
     //     core::mem::size_of::<Sv39Table>(),
     // );
     // return to old address
-    asm!("jalr t5");
+    // asm!("jalr t5");
+    // return to given addr
+    asm!("jalr {0}", in(reg) jump_to, in("ra") ra, in("a0") a0, in("a1") a1, options(noreturn));
 }
