@@ -20,16 +20,16 @@ const fn subdivide_size<T: Sized>(size: usize) -> usize {
 /// Safe only to be called from asm entry.
 #[no_mangle]
 #[allow(improper_ctypes_definitions)]
-pub unsafe extern "C" fn setup_environment(dtb_addr: *mut u8, old_kern_start: u64) {
+pub unsafe extern "C" fn setup_environment(dtb_addr: *mut u8, old_kern_start: usize) {
     // setup stack and gp too
-    let gp: u64;
-    let sp: u64;
+    let gp: usize;
+    let sp: usize;
     // let ra: u64;
     asm!("mv {0}, gp", out(reg) gp);
     asm!("mv {0}, sp", out(reg) sp);
     // asm!("mv {0}, ra", out(reg) ra);
-    asm!("mv gp, {0}", in(reg) gp - old_kern_start + (HIGHER_HALF_BASE as u64));
-    asm!("mv sp, {0}", in(reg) sp - old_kern_start + (HIGHER_HALF_BASE as u64));
+    asm!("mv gp, {0}", in(reg) gp - old_kern_start + HIGHER_HALF_BASE);
+    asm!("mv sp, {0}", in(reg) sp - old_kern_start + HIGHER_HALF_BASE);
 
     // Unmap old page table
     // __root_page_table.unmap_gigapage(old_kern_start);
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn setup_environment(dtb_addr: *mut u8, old_kern_start: u6
     }
 
     // run kinit
-    core::mem::transmute::<_, extern "C" fn(*mut u8, u64)>(
+    core::mem::transmute::<_, extern "C" fn(*mut u8, usize)>(
         (crate::kinit as usize) - (old_kern_start as usize) + HIGHER_HALF_BASE,
     )(dtb_addr, old_kern_start)
 }

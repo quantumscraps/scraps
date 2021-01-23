@@ -13,7 +13,7 @@ use crate::{
 // 0x100
 pub const PAGE_SIZE: usize = 4096;
 
-pub const ONEGIG: u64 = 0x40000000;
+pub const ONEGIG: usize = 0x40000000;
 
 #[repr(u8)]
 pub enum PagingMode {
@@ -27,8 +27,8 @@ pub trait Sv {
 }
 
 pub trait SvPTE: Sized {
-    fn from_physical_addr(addr: u64) -> Self;
-    fn physical_addr(&self) -> u64;
+    fn from_physical_addr(addr: usize) -> Self;
+    fn physical_addr(&self) -> usize;
     fn valid(&self) -> bool;
     fn global(&self) -> bool;
     fn permissions(&self) -> XWRPermissions;
@@ -48,19 +48,19 @@ pub trait SvTable: PageTable {
     }
 
     /// Maps a 1GiB gigapage by rounding the given address.
-    fn map_gigapage(&mut self, virt_addr: u64, phys_addr: u64, permissions: XWRPermissions);
+    fn map_gigapage(&mut self, virt_addr: usize, phys_addr: usize, permissions: XWRPermissions);
 
     /// Maps a 4KiB page by rounding the given address.
-    fn map_page(&mut self, virt_addr: u64, phys_addr: u64, permissions: XWRPermissions);
+    fn map_page(&mut self, virt_addr: usize, phys_addr: usize, permissions: XWRPermissions);
 
     /// Unmaps a 4KiB page by rounding the given address.
-    fn unmap_page(&mut self, virt_addr: u64);
+    fn unmap_page(&mut self, virt_addr: usize);
 
     /// Maps a 1GiB gigapage by rounding the given address.
-    fn unmap_gigapage(&mut self, virt_addr: u64);
+    fn unmap_gigapage(&mut self, virt_addr: usize);
 
     /// Makes a deep clone of this page table.
-    fn deep_clone(&self, current_pt: &Self, old_base: u64, new_base: u64) -> &mut Self;
+    fn deep_clone(&self, current_pt: &Self, old_base: usize, new_base: usize) -> &mut Self;
 
     /// Deep frees this page table.
     fn deep_free(self: &mut Self);
@@ -69,25 +69,24 @@ pub trait SvTable: PageTable {
     /// The begin address is rounded down, and the end address is rounded up.
     fn map_page_range(
         &mut self,
-        virt_addr_begin: u64,
-        virt_addr_end: u64,
-        phys_addr_begin: u64,
+        virt_addr_begin: usize,
+        virt_addr_end: usize,
+        phys_addr_begin: usize,
         permissions: XWRPermissions,
     ) {
-        let page_size_u64 = PAGE_SIZE as u64;
-        let virt_offset = virt_addr_begin / page_size_u64;
-        let phys_offset = phys_addr_begin / page_size_u64;
-        let virt_addr_begin = virt_addr_begin & !(page_size_u64 - 1);
-        let virt_addr_end = if virt_addr_end % page_size_u64 > 0 {
-            ((virt_addr_end) & !(page_size_u64 - 1)) + page_size_u64
+        let virt_offset = virt_addr_begin / PAGE_SIZE;
+        let phys_offset = phys_addr_begin / PAGE_SIZE;
+        let virt_addr_begin = virt_addr_begin & !(PAGE_SIZE - 1);
+        let virt_addr_end = if virt_addr_end % PAGE_SIZE > 0 {
+            ((virt_addr_end) & !(PAGE_SIZE - 1)) + PAGE_SIZE
         } else {
             virt_addr_end
         };
-        let len = (virt_addr_end - virt_addr_begin) / page_size_u64;
+        let len = (virt_addr_end - virt_addr_begin) / PAGE_SIZE;
         printk!("Mapping {} pages", len);
         for i in 0..len {
-            let virt_addr = (i + virt_offset) * page_size_u64;
-            let phys_addr = (i + phys_offset) * page_size_u64;
+            let virt_addr = (i + virt_offset) * PAGE_SIZE;
+            let phys_addr = (i + phys_offset) * PAGE_SIZE;
             // printk!("Mapping {:x} -> {:x}", virt_addr, phys_addr);
             self.map_page(virt_addr, phys_addr, permissions);
         }
@@ -95,20 +94,19 @@ pub trait SvTable: PageTable {
 
     /// Unmaps a range of pages using [map_page]
     /// Same behavior as [map_page_range].
-    fn unmap_page_range(&mut self, virt_addr_begin: u64, virt_addr_end: u64) {
-        let page_size_u64 = PAGE_SIZE as u64;
-        let virt_offset = virt_addr_begin / page_size_u64;
-        // let phys_offset = phys_addr_begin / page_size_u64;
-        let virt_addr_begin = virt_addr_begin & !(page_size_u64 - 1);
-        let virt_addr_end = if virt_addr_end % page_size_u64 > 0 {
-            ((virt_addr_end) & !(page_size_u64 - 1)) + page_size_u64
+    fn unmap_page_range(&mut self, virt_addr_begin: usize, virt_addr_end: usize) {
+        let virt_offset = virt_addr_begin / PAGE_SIZE;
+        // let phys_offset = phys_addr_begin / PAGE_SIZE;
+        let virt_addr_begin = virt_addr_begin & !(PAGE_SIZE - 1);
+        let virt_addr_end = if virt_addr_end % PAGE_SIZE > 0 {
+            ((virt_addr_end) & !(PAGE_SIZE - 1)) + PAGE_SIZE
         } else {
             virt_addr_end
         };
-        let len = (virt_addr_end - virt_addr_begin) / page_size_u64;
+        let len = (virt_addr_end - virt_addr_begin) / PAGE_SIZE;
         printk!("Unmapping {} pages", len);
         for i in 0..len {
-            let virt_addr = (i + virt_offset) * page_size_u64;
+            let virt_addr = (i + virt_offset) * PAGE_SIZE;
             // let phys_addr = (i + phys_offset) * page_size_u64;
             // printk!("Unmapping {:x}", virt_addr);
             self.unmap_page(virt_addr);
@@ -119,16 +117,16 @@ pub trait SvTable: PageTable {
     fn map_page_setup(&mut self, setup: &PagingSetup) {
         for (&virt_base, &(start, end, permissions)) in setup.mappings().iter() {
             self.map_page_range(
-                virt_base as u64,
-                (end - start + virt_base) as u64,
-                start as u64,
+                virt_base,
+                end - start + virt_base,
+                start,
                 permissions.into(),
             );
         }
     }
 
     /// Looks up a virtual address.
-    fn virt_to_phys(&self, virt_addr: u64) -> u64;
+    fn virt_to_phys(&self, virt_addr: usize) -> usize;
 
     fn entries(&self) -> &[Self::PTE];
 
@@ -209,12 +207,12 @@ pub struct Sv39PTE {
 }
 
 impl SvPTE for Sv39PTE {
-    fn from_physical_addr(addr: u64) -> Self {
+    fn from_physical_addr(addr: usize) -> Self {
         let (ppn2, ppn1, ppn0) = split_phys_addr_sv39(addr);
         Self::new().with_ppn2(ppn2).with_ppn1(ppn1).with_ppn0(ppn0)
     }
 
-    fn physical_addr(&self) -> u64 {
+    fn physical_addr(&self) -> usize {
         unsplit_phys_addr_sv39((self.ppn2(), self.ppn1(), self.ppn0()))
     }
 
@@ -232,7 +230,7 @@ impl SvPTE for Sv39PTE {
 }
 
 /// Splits a Sv39 virtual address into (VPN[2], VPN[1], VPN[0])
-fn split_virt_addr_sv39(addr: u64) -> (u16, u16, u16) {
+fn split_virt_addr_sv39(addr: usize) -> (u16, u16, u16) {
     let vpn0 = (addr >> 12) & ((1 << 9) - 1);
     let vpn1 = (addr >> 21) & ((1 << 9) - 1);
     let vpn2 = (addr >> 30) & ((1 << 9) - 1);
@@ -240,7 +238,7 @@ fn split_virt_addr_sv39(addr: u64) -> (u16, u16, u16) {
 }
 
 /// Splits a physical address into (PPN[2], PPN[1], PPN[0])
-fn split_phys_addr_sv39(addr: u64) -> (u32, u16, u16) {
+fn split_phys_addr_sv39(addr: usize) -> (u32, u16, u16) {
     let ppn0 = (addr >> 12) & ((1 << 9) - 1);
     let ppn1 = (addr >> 21) & ((1 << 9) - 1);
     let ppn2 = (addr >> 30) & ((1 << 26) - 1);
@@ -258,10 +256,10 @@ fn split_phys_addr_sv39(addr: u64) -> (u32, u16, u16) {
 }
 
 /// Merges (PPN[2], PPN[1], PPN[0]) into a physical address.
-fn unsplit_phys_addr_sv39(parts: (u32, u16, u16)) -> u64 {
-    let ppn2 = parts.0 as u64;
-    let ppn1 = parts.1 as u64;
-    let ppn0 = parts.2 as u64;
+fn unsplit_phys_addr_sv39(parts: (u32, u16, u16)) -> usize {
+    let ppn2 = parts.0 as usize;
+    let ppn1 = parts.1 as usize;
+    let ppn0 = parts.2 as usize;
     let res = (ppn0 << 12) | (ppn1 << 21) | (ppn2 << 30);
     // printk!(
     //     "Unsplit {:026x}, {:09x}, {:09x} -> {:056x}",
@@ -334,7 +332,7 @@ impl SvTable for Sv39Table {
     type PTE = Sv39PTE;
     const ENTRIES: usize = type_divide::<Self::PTE>(PAGE_SIZE);
 
-    fn map_gigapage(&mut self, virt_addr: u64, phys_addr: u64, permissions: XWRPermissions) {
+    fn map_gigapage(&mut self, virt_addr: usize, phys_addr: usize, permissions: XWRPermissions) {
         // let virt_addr = virt_addr & !(onegig - 1);
         // round the address down
         let index = virt_addr / ONEGIG;
@@ -348,7 +346,7 @@ impl SvTable for Sv39Table {
             .with_permissions(permissions);
     }
 
-    fn unmap_gigapage(&mut self, virt_addr: u64) {
+    fn unmap_gigapage(&mut self, virt_addr: usize) {
         // let virt_addr = virt_addr & !(onegig - 1);
         // round the address down
         let index = virt_addr / ONEGIG;
@@ -360,9 +358,9 @@ impl SvTable for Sv39Table {
     }
 
     /// maps a 4k page by rounding the given addr
-    fn map_page(&mut self, virt_addr: u64, phys_addr: u64, permissions: XWRPermissions) {
+    fn map_page(&mut self, virt_addr: usize, phys_addr: usize, permissions: XWRPermissions) {
         // mask out page_size of phys_addr
-        let phys_addr2 = phys_addr & !(PAGE_SIZE as u64 - 1);
+        let phys_addr2 = phys_addr & !(PAGE_SIZE - 1);
         // split virt addr
         let (vpn2, vpn1, vpn0) = split_virt_addr_sv39(virt_addr);
         // printk!(
@@ -380,7 +378,7 @@ impl SvTable for Sv39Table {
             // allocate page
             let new_addr = unsafe { &mut ALLOCATOR }
                 .try_zallocate(PAGE_SIZE)
-                .expect("Failed to allocate page!") as u64;
+                .expect("Failed to allocate page!") as usize;
             // set entry
             *root_entry = Sv39PTE::from_physical_addr(new_addr)
                 .with_valid(true)
@@ -396,7 +394,7 @@ impl SvTable for Sv39Table {
             // allocate page
             let new_addr = unsafe { &mut ALLOCATOR }
                 .try_zallocate(PAGE_SIZE)
-                .expect("Failed to allocate page!") as u64;
+                .expect("Failed to allocate page!") as usize;
             // set entry
             *level1_entry = Sv39PTE::from_physical_addr(new_addr)
                 .with_valid(true)
@@ -417,7 +415,7 @@ impl SvTable for Sv39Table {
     }
 
     /// maps a 4k page by rounding the given addr
-    fn unmap_page(&mut self, virt_addr: u64) {
+    fn unmap_page(&mut self, virt_addr: usize) {
         // mask out page_size of phys_addr
         // let phys_addr2 = phys_addr & !(PAGE_SIZE as u64 - 1);
         // split virt addr
@@ -449,7 +447,7 @@ impl SvTable for Sv39Table {
         level2_entry.set_valid(false);
     }
 
-    fn virt_to_phys(&self, virt_addr: u64) -> u64 {
+    fn virt_to_phys(&self, virt_addr: usize) -> usize {
         // let virt_addr = virt_addr & ((1 << 39) - 1);
         // let index = virt_addr / ONEGIG;
         let (vpn2, vpn1, vpn0) = split_virt_addr_sv39(virt_addr);
@@ -464,8 +462,8 @@ impl SvTable for Sv39Table {
             // resolve here
             let phys_gaddr = root_entry.physical_addr();
             return phys_gaddr
-                + ((vpn1 as u64) << 21)
-                + ((vpn0 as u64) << 12)
+                + ((vpn1 as usize) << 21)
+                + ((vpn0 as usize) << 12)
                 + (virt_addr % (1 << 9));
         }
         let level1_table = unsafe { &*(root_entry.physical_addr() as *const Self) };
@@ -478,7 +476,7 @@ impl SvTable for Sv39Table {
         }
         if level1_entry.permissions() != XWRPermissions::Pointer {
             let phys_gaddr = level1_entry.physical_addr();
-            return phys_gaddr + ((vpn0 as u64) << 12) + (virt_addr % (1 << 9));
+            return phys_gaddr + ((vpn0 as usize) << 12) + (virt_addr % (1 << 9));
         }
         let level2_table = unsafe { &*(level1_entry.physical_addr() as *const Self) };
         let level2_entry = level2_table.entries[vpn0 as usize];
@@ -496,7 +494,7 @@ impl SvTable for Sv39Table {
         &self.entries
     }
 
-    fn deep_clone(&self, current_pt: &Self, old_base: u64, new_base: u64) -> &mut Self {
+    fn deep_clone(&self, current_pt: &Self, old_base: usize, new_base: usize) -> &mut Self {
         let root_clone = unsafe {
             Self::cast_page_table(
                 ALLOCATOR
@@ -542,7 +540,7 @@ impl SvTable for Sv39Table {
                         // Set new addr
                         *level2_entry = Sv39PTE::from_physical_addr(SvTable::virt_to_phys(
                             current_pt,
-                            level2_clone as *mut _ as u64,
+                            level2_clone as *mut _ as usize,
                         ))
                         .with_valid(level2_entry.valid())
                         .with_global(level2_entry.global())
@@ -553,7 +551,7 @@ impl SvTable for Sv39Table {
                 // Set new addr
                 *level1_entry = Sv39PTE::from_physical_addr(SvTable::virt_to_phys(
                     current_pt,
-                    level1_clone as *mut _ as u64,
+                    level1_clone as *mut _ as usize,
                 ))
                 .with_valid(level1_entry.valid())
                 .with_global(level1_entry.global())
@@ -629,8 +627,8 @@ pub unsafe fn enable_paging<PageSystem: Sv + ?Sized>(table: &PageSystem::Table) 
     if addr % PAGE_SIZE != 0 {
         panic!("Table is not page-aligned");
     }
-    let mode = PageSystem::MODE as u64;
-    let ppn = (addr / PAGE_SIZE) as u64;
+    let mode = PageSystem::MODE as usize;
+    let ppn = addr / PAGE_SIZE;
     printk!(
         "ppn = 0x{:x}, ppn << 12 = 0x{:x}, addr = 0x{:x}",
         ppn,
@@ -656,8 +654,8 @@ pub unsafe fn enable_paging2<PageSystem: Sv + ?Sized>(phys_addr: usize) {
     if addr % PAGE_SIZE != 0 {
         panic!("Table is not page-aligned");
     }
-    let mode = PageSystem::MODE as u64;
-    let ppn = (addr / PAGE_SIZE) as u64;
+    let mode = PageSystem::MODE as usize;
+    let ppn = addr / PAGE_SIZE;
     printk!(
         "ppn = 0x{:x}, ppn << 12 = 0x{:x}, addr = 0x{:x}",
         ppn,
@@ -742,7 +740,7 @@ pub static mut __root_page_table: Sv39Table = Sv39Table::new();
 
 #[inline(never)]
 pub unsafe extern "C" fn init() {
-    let ra: u64;
+    let ra: usize;
     asm!("mv {0}, ra", out(reg) ra);
     // Create a page table with kernel mapped to higher half, and STDOUT identity mapped
     let page_table_ptr = ALLOCATOR
@@ -751,8 +749,8 @@ pub unsafe extern "C" fn init() {
     let page_table = Sv39Table::cast_page_table(page_table_ptr);
     // map in kernel
     link_var!(__kern_start, __kern_end);
-    let kern_start = &__kern_start as *const _ as u64;
-    let kern_end = &__kern_end as *const _ as u64;
+    let kern_start = &__kern_start as *const _ as usize;
+    let kern_end = &__kern_end as *const _ as usize;
     // identity map until we disable it later
     page_table.map_gigapage(kern_start, kern_start, Permissions::RWX.into());
     page_table.map_gigapage(HIGHER_HALF_BASE as _, kern_start, Permissions::RWX.into());
@@ -775,47 +773,46 @@ pub unsafe extern "C" fn init() {
         + HIGHER_HALF_BASE) as *const usize);
     printk!("PAGING_TEST from higher half: {:x}", ptest);
     // enable page table and jump to higher half
-    let jump_to = (higher_half_mmu_cont as u64) - kern_start + (HIGHER_HALF_BASE as u64);
+    let jump_to = (higher_half_mmu_cont as usize) - kern_start + HIGHER_HALF_BASE;
     printk!("Jumping to {:x}", jump_to);
     // setup stack and gp too
-    let gp: u64;
-    let sp: u64;
+    let gp: usize;
+    let sp: usize;
     // let ra: u64;
     asm!("mv {0}, gp", out(reg) gp);
     asm!("mv {0}, sp", out(reg) sp);
     // asm!("mv {0}, ra", out(reg) ra);
-    asm!("mv gp, {0}", in(reg) gp - kern_start + (HIGHER_HALF_BASE as u64));
-    asm!("mv sp, {0}", in(reg) sp - kern_start + (HIGHER_HALF_BASE as u64));
-    asm!("mv t5, {0}", in(reg) ra - kern_start + (HIGHER_HALF_BASE as u64), lateout("t5") _);
+    asm!("mv gp, {0}", in(reg) gp - kern_start + HIGHER_HALF_BASE);
+    asm!("mv sp, {0}", in(reg) sp - kern_start + HIGHER_HALF_BASE);
+    asm!("mv t5, {0}", in(reg) ra - kern_start + HIGHER_HALF_BASE, lateout("t5") _);
     // printk!("New ra = {:x}", ra - kern_start + (HIGHER_HALF_BASE as u64));
     let f = core::mem::transmute::<_, unsafe extern "C" fn(u64, u64)>(jump_to);
     asm!("jalr {0}", in(reg) f, in("a0") kern_start, in("a1") kern_end);
     // f(kern_start, kern_end);
 }
 
-unsafe extern "C" fn higher_half_mmu_cont(old_kern_start: u64, old_kern_end: u64) {
+unsafe extern "C" fn higher_half_mmu_cont(old_kern_start: usize, old_kern_end: usize) {
     // asm!("sub ra, ra, {0}", "add ra, ra, {1}", in(reg) old_kern_start, in(reg) HIGHER_HALF_BASE, lateout("ra") _);
     // Reserve t5
     asm!("", lateout("t5") _);
-    let satp: u64;
+    let satp: usize;
     asm!("csrr {0}, satp", out(reg) satp);
     // Fix stvec before enabling new table
-    let stvec: u64;
+    let stvec: usize;
     asm!("csrr {0}, stvec", out(reg) stvec);
-    asm!("csrw stvec, {0}", in(reg) stvec - old_kern_start + (HIGHER_HALF_BASE as u64));
+    asm!("csrw stvec, {0}", in(reg) stvec - old_kern_start + HIGHER_HALF_BASE);
     // Fix sscratch
-    let sscratch: u64;
+    let sscratch: usize;
     asm!("csrr {0}, sscratch", out(reg) sscratch);
-    let new_sscratch = sscratch - old_kern_start + (HIGHER_HALF_BASE as u64);
+    let new_sscratch = sscratch - old_kern_start + HIGHER_HALF_BASE;
     asm!("csrw sscratch, {0}", in(reg) new_sscratch);
     // Fix trap stack!
     let trap_frame = &mut *(new_sscratch as *mut TrapFrame);
     trap_frame.trap_stack = trap_frame
         .trap_stack
-        .offset(((HIGHER_HALF_BASE as u64) - old_kern_start) as _);
+        .offset((HIGHER_HALF_BASE - old_kern_start) as _);
     // (0 as *const usize).read_volatile();
-    let page_table_ptr = ((satp & ((1 << 44) - 1)) * (PAGE_SIZE as u64)) - old_kern_start
-        + (HIGHER_HALF_BASE as u64);
+    let page_table_ptr = ((satp & ((1 << 44) - 1)) * PAGE_SIZE) - old_kern_start + HIGHER_HALF_BASE;
     let page_table = Sv39Table::cast_page_table(page_table_ptr as _);
     // Create a copy!
     printk!("Value of stack satp = {:x}", &satp as *const _ as usize);

@@ -10,8 +10,8 @@ use crate::{
 // ~= 0.25
 // therefore use TICKS_PER_NANO = 2.5
 // (this seems pretty correct based on testing)
-pub const TICKS_PER_NANO: u64 = 3; // 10 / 4 ~= 3, should probably add floats though
-pub const NANOS_PER_TICK: u64 = 1;
+pub const TICKS_PER_NANO: usize = 3; // 10 / 4 ~= 3, should probably add floats though
+pub const NANOS_PER_TICK: usize = 1;
 pub const HAS_RDTIME: bool = false;
 
 pub fn map_page_setup(setup: &PagingSetup) -> &mut impl PageTable {

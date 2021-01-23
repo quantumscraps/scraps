@@ -22,31 +22,31 @@ impl CLINT {
     }
 
     /// Gets the address of the mtime register.
-    pub fn mtime_address(&self) -> *const u64 {
+    pub fn mtime_address(&self) -> *const usize {
         self.assert_init();
-        unsafe { (self.base_address as *const u8).add(0xbff8).cast::<u64>() }
+        unsafe { (self.base_address as *const u8).add(0xbff8).cast::<usize>() }
     }
 
     /// Reads the mtime register.
-    pub fn mtime(&self) -> u64 {
+    pub fn mtime(&self) -> usize {
         self.assert_init();
         unsafe { self.mtime_address().read_volatile() }
     }
 
     /// Gets the address of the mtimecmp register.
-    pub fn mtimecmp_address(&self) -> *mut u64 {
+    pub fn mtimecmp_address(&self) -> *mut usize {
         self.assert_init();
-        unsafe { (self.base_address as *mut u8).add(0x4000).cast::<u64>() }
+        unsafe { (self.base_address as *mut u8).add(0x4000).cast::<usize>() }
     }
 
     /// Reads the mtimecmp register.
-    pub fn mtimecmp(&self) -> u64 {
+    pub fn mtimecmp(&self) -> usize {
         self.assert_init();
         unsafe { self.mtimecmp_address().read_volatile() }
     }
 
     /// Writes to the mtimecmp register.
-    pub fn set_mtimecmp(&mut self, value: u64) {
+    pub fn set_mtimecmp(&mut self, value: usize) {
         self.assert_init();
         unsafe { self.mtimecmp_address().write_volatile(value) }
     }

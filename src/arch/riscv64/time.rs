@@ -13,8 +13,8 @@ pub fn time_counter() -> &'static impl time::TimeCounter {
 
 impl RISCVTimer {
     #[inline(always)]
-    fn raw_time(&self) -> u64 {
-        let mut time: u64;
+    fn raw_time(&self) -> usize {
+        let mut time: usize;
         unsafe {
             if HAS_RDTIME {
                 asm!(
@@ -36,16 +36,16 @@ impl time::TimeCounter for RISCVTimer {
     fn accuracy(&self) -> Duration {
         // empirically measure timer accuracy
         const SAMPLE_SIZE: usize = 1_000_000;
-        let mut diff_total: u64 = 0;
+        let mut diff_total: usize = 0;
         for _ in 0..SAMPLE_SIZE {
             let d1 = self.raw_time();
             let d2 = self.raw_time();
             diff_total += d2 - d1;
         }
-        Duration::from_nanos(diff_total / SAMPLE_SIZE as u64 * NANOS_PER_TICK / TICKS_PER_NANO)
+        Duration::from_nanos((diff_total / SAMPLE_SIZE * NANOS_PER_TICK / TICKS_PER_NANO) as u64)
     }
     fn uptime(&self) -> Duration {
-        Duration::from_nanos(self.raw_time() * NANOS_PER_TICK / TICKS_PER_NANO)
+        Duration::from_nanos((self.raw_time() * NANOS_PER_TICK / TICKS_PER_NANO) as u64)
     }
     fn wait_for(&self, duration: Duration) {
         let begin = self.uptime();

@@ -1,7 +1,6 @@
 use crate::{
     link_var,
     mmu::{PageTable, Permissions, HIGHER_HALF_BASE},
-    util::HeaplessResult,
 };
 
 use super::mmu::{SvTable, __root_page_table, ONEGIG};
@@ -51,13 +50,13 @@ pub unsafe extern "C" fn __early_entry(_: *const i8, dtb_addr: *mut u8) -> ! {
 
     // Setup root page table and set SATP
     link_var!(__kern_start, __kern_end);
-    let kern_start = &__kern_start as *const _ as u64;
-    let kern_end = &__kern_end as *const _ as u64;
+    let kern_start = &__kern_start as *const _ as usize;
+    let kern_end = &__kern_end as *const _ as usize;
     let begin_index = kern_start / ONEGIG;
     let end_index = kern_end / ONEGIG;
     for i in 0..=(end_index - begin_index) {
         let phys_addr = (i + begin_index) * ONEGIG;
-        let hh_addr = (i * ONEGIG) + (HIGHER_HALF_BASE as u64);
+        let hh_addr = (i * ONEGIG) + HIGHER_HALF_BASE;
         __root_page_table.map_gigapage(phys_addr, phys_addr, Permissions::RWX.into());
         __root_page_table.map_gigapage(hh_addr, phys_addr, Permissions::RWX.into());
     }
@@ -65,12 +64,12 @@ pub unsafe extern "C" fn __early_entry(_: *const i8, dtb_addr: *mut u8) -> ! {
     // asm!("csrw satp, {0}", in(reg) &__root_page_table);
     __root_page_table.enable();
 
-    asm!("csrw mepc, {0}", in(reg) (crate::memory::setup_environment as usize) - (kern_start as usize) + HIGHER_HALF_BASE);
+    asm!("csrw mepc, {0}", in(reg) (crate::memory::setup_environment as usize) - kern_start + HIGHER_HALF_BASE);
     extern "C" {
         fn asm_trap_vector();
     }
-    asm!("csrw stvec, {0}", in(reg) (asm_trap_vector as usize) - (kern_start as usize) + HIGHER_HALF_BASE);
-    asm!("csrw sscratch, {0}", in(reg) (&mut super::trap::__trap_frame as *mut _ as usize) - (kern_start as usize) + HIGHER_HALF_BASE);
+    asm!("csrw stvec, {0}", in(reg) (asm_trap_vector as usize) - kern_start + HIGHER_HALF_BASE);
+    asm!("csrw sscratch, {0}", in(reg) (&mut super::trap::__trap_frame as *mut _ as usize) - kern_start + HIGHER_HALF_BASE);
 
     // return
     asm!(

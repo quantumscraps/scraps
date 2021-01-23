@@ -77,7 +77,7 @@ static PROCESSES: UnsafeMutex<[Option<Process>; 4]> = UnsafeMutex::new([None; 4]
 /// [setup_environment]: memory::setup_environment
 #[no_mangle]
 #[allow(improper_ctypes_definitions)] // We only use extern "C" for calling convention
-pub extern "C" fn kinit(dtb_addr: *mut u8, old_kern_start: u64) {
+pub extern "C" fn kinit(dtb_addr: *mut u8, old_kern_start: usize) {
     // unmap old kernel base
     // unsafe {
     //     __root_page_table.unmap_gigapage(old_kern_start);
@@ -87,7 +87,7 @@ pub extern "C" fn kinit(dtb_addr: *mut u8, old_kern_start: u64) {
     unsafe {
         *STDOUT.get_mut() = Some(drivers::known_good_uart());
         // map uart
-        let addr = STDOUT.get_mut().as_mut().unwrap().base_address() as u64;
+        let addr = STDOUT.get_mut().as_mut().unwrap().base_address();
         __root_page_table.map_page(
             addr,
             addr,
