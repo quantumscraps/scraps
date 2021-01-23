@@ -1,5 +1,4 @@
 use crate::driver_interfaces::{Console, Uart};
-use fdt_rs::prelude::*;
 use register::{mmio::*, register_bitfields, register_structs};
 
 // Info from the datasheet
@@ -126,20 +125,6 @@ impl Uart for NS16550A {
 impl Console for NS16550A {
     fn init(&mut self) {
         Uart::init(self)
-    }
-
-    fn from_dtb(dtb: &fdt_rs::base::DevTreeNode) -> Option<Self> {
-        // Get register location and initialize from that
-        let reg = dtb
-            .props()
-            .filter(|x| Ok(x.name() == Ok("reg")))
-            .next()
-            .ok()??;
-        let address = reg.u64(0).ok()?;
-        let mut uart = unsafe { Self::new(address as _) };
-        use core::fmt::Write;
-        let _ = core::writeln!(uart, "Initialized UART @ 0x{:x}", address);
-        Some(uart)
     }
 
     fn base_address(&self) -> usize {

@@ -40,9 +40,10 @@ mod process;
 mod time;
 mod util;
 
-use arch::mmu::{SvTable, __root_page_table};
-use driver_interfaces::UartConsole;
-use fdt_rs::base::DevTree;
+use arch::mmu::{SvTable, XWRPermissions, __root_page_table};
+use driver_interfaces::{Console, UartConsole};
+use drivers::known_good_uart;
+use mmu::Permissions;
 use physical_page_allocator::ALLOCATOR;
 use process::Process;
 use util::{HeaplessResult, UnsafeMutex};
@@ -76,25 +77,27 @@ static PROCESSES: UnsafeMutex<[Option<Process>; 4]> = UnsafeMutex::new([None; 4]
 /// [setup_environment]: memory::setup_environment
 #[no_mangle]
 #[allow(improper_ctypes_definitions)] // We only use extern "C" for calling convention
-pub extern "C" fn kinit(dtb_addr: *mut u8, old_kern_start: u64) -> HeaplessResult<!> {
+pub extern "C" fn kinit(dtb_addr: *mut u8, old_kern_start: u64) {
     // unmap old kernel base
-    unsafe {
-        __root_page_table.unmap_gigapage(old_kern_start);
-        asm!("sfence.vma");
-    }
+    // unsafe {
+    //     __root_page_table.unmap_gigapage(old_kern_start);
+    //     asm!("sfence.vma");
+    // }
 
-    let dtb = unsafe {
-        let size = DevTree::read_totalsize(core::slice::from_raw_parts(
-            dtb_addr as *const _,
-            DevTree::MIN_HEADER_SIZE,
-        ))?;
-        DevTree::new(core::slice::from_raw_parts(dtb_addr as *const _, size))?
-    };
-    drivers::detect_stdout(&dtb)?;
+    unsafe {
+        *STDOUT.get_mut() = Some(drivers::known_good_uart());
+        // map uart
+        let addr = STDOUT.get_mut().as_mut().unwrap().base_address() as u64;
+        __root_page_table.map_page(
+            addr,
+            addr,
+            XWRPermissions::Read | XWRPermissions::Write | XWRPermissions::Execute,
+        );
+    }
 
     unsafe {
         // setup allocator
-        ALLOCATOR.default_init();
+        // ALLOCATOR.default_init();
         // setup mmu
         // arch::mmu::init();
     };

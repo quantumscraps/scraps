@@ -65,7 +65,7 @@ pub unsafe extern "C" fn __early_entry(_: *const i8, dtb_addr: *mut u8) -> ! {
     // asm!("csrw satp, {0}", in(reg) &__root_page_table);
     __root_page_table.enable();
 
-    asm!("csrw mepc, {0}", in(reg) crate::memory::setup_environment);
+    asm!("csrw mepc, {0}", in(reg) (crate::memory::setup_environment as usize) - (kern_start as usize) + HIGHER_HALF_BASE);
     extern "C" {
         fn asm_trap_vector();
     }
@@ -75,17 +75,9 @@ pub unsafe extern "C" fn __early_entry(_: *const i8, dtb_addr: *mut u8) -> ! {
     // return
     asm!(
         "mret",
-        in("ra") (__early_entry_return as usize) - (kern_start as usize) + HIGHER_HALF_BASE,
-        in("a1") dtb_addr,
-        in("a2") kern_start,
+        in("ra") (wait_forever as usize) - (kern_start as usize) + HIGHER_HALF_BASE,
+        in("a0") dtb_addr,
+        in("a1") kern_start,
         options(noreturn),
     );
-}
-
-/// # Safety
-/// Don't call.
-#[allow(improper_ctypes_definitions)]
-unsafe extern "C" fn __early_entry_return(r: HeaplessResult<!>) -> ! {
-    crate::panic::print_backtrace_from_kinit(r);
-    wait_forever()
 }

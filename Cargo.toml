@@ -10,7 +10,6 @@ lto = true
 debug-assertions = true
 
 [dependencies]
-fdt-rs = { version = "0.4", default-features = false }
 spin = "0.7"
 register = "1.0"
 cortex-a = { version = "5.1", optional = true }

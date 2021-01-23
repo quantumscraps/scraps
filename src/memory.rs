@@ -20,10 +20,7 @@ const fn subdivide_size<T: Sized>(size: usize) -> usize {
 /// Safe only to be called from asm entry.
 #[no_mangle]
 #[allow(improper_ctypes_definitions)]
-pub unsafe extern "C" fn setup_environment(
-    dtb_addr: *mut u8,
-    old_kern_start: u64,
-) -> HeaplessResult<!> {
+pub unsafe extern "C" fn setup_environment(dtb_addr: *mut u8, old_kern_start: u64) {
     // setup stack and gp too
     let gp: u64;
     let sp: u64;
@@ -51,7 +48,7 @@ pub unsafe extern "C" fn setup_environment(
     }
 
     // run kinit
-    core::mem::transmute::<_, extern "C" fn(*mut u8, u64) -> HeaplessResult<!>>(
+    core::mem::transmute::<_, extern "C" fn(*mut u8, u64)>(
         (crate::kinit as usize) - (old_kern_start as usize) + HIGHER_HALF_BASE,
     )(dtb_addr, old_kern_start)
 }

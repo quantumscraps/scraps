@@ -1,7 +1,5 @@
 use core::fmt::{Debug, Display};
 
-use fdt_rs::error::DevTreeError;
-
 pub trait HeaplessErrorExt {
     type Ok;
 
@@ -10,19 +8,12 @@ pub trait HeaplessErrorExt {
 
 #[derive(Debug, Clone)]
 pub enum HeaplessError {
-    DevTreeError(DevTreeError),
     StrError(&'static str),
 }
 
 impl HeaplessError {
     pub fn msg(msg: &'static str) -> Self {
         Self::StrError(msg)
-    }
-}
-
-impl From<DevTreeError> for HeaplessError {
-    fn from(err: DevTreeError) -> Self {
-        Self::DevTreeError(err)
     }
 }
 
@@ -35,7 +26,6 @@ impl From<&'static str> for HeaplessError {
 impl Display for HeaplessError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::DevTreeError(e) => write!(f, "{:?}", e),
             Self::StrError(s) => write!(f, "{}", s),
         }
     }

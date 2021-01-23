@@ -1,10 +1,5 @@
 use core::fmt::{Debug, Write};
 
-use fdt_rs::{
-    base::DevTreeNode,
-    prelude::{FallibleIterator, PropReader},
-};
-
 use crate::drivers::ns16550a::NS16550A;
 
 /// A UART that can be written to.
@@ -22,13 +17,6 @@ pub trait Uart: Write {
 pub trait Console: Write + Debug {
     /// Initializes this console for output.
     fn init(&mut self);
-
-    /// Creates a console from the given device tree node.
-    /// Can return `None` if it was not possible to create
-    /// this kind of console from the given node.
-    fn from_dtb(dtb: &DevTreeNode) -> Option<Self>
-    where
-        Self: Sized;
 
     /// Gets the base address of this console.
     fn base_address(&self) -> usize;
@@ -72,26 +60,6 @@ impl Write for UartConsole {
 impl Console for UartConsole {
     fn init(&mut self) {
         self.console_mut().init()
-    }
-
-    fn from_dtb(dtb: &DevTreeNode) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        let compatible = dtb
-            .props()
-            .filter(|prop| Ok(prop.name() == Ok("compatible")))
-            .next()
-            .ok()??
-            .str()
-            .ok()?;
-        match compatible {
-            #[cfg(feature = "bsp_riscvirt")]
-            "ns16550a" => NS16550A::from_dtb(dtb).map(Self::NS16550A),
-            #[cfg(feature = "bsp_raspi64")]
-            "pl011" => PL011::from_dtb(dtb).map(Self::PL011),
-            _ => None,
-        }
     }
 
     fn base_address(&self) -> usize {
