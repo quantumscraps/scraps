@@ -217,4 +217,6 @@ def main():
         clean()
     else:
         usage(exe)
-main()
+
+if __name__ == "__main__":
+    main()
